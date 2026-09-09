@@ -1,0 +1,500 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Gamepad2, Bot, Cpu, Zap, ShieldCheck, HardDrive, Terminal,
+  Globe2, ArrowRight, CheckCircle2, Sparkles, Server, Clock, Users, Flame,
+  Sliders, Gauge, Layers
+} from 'lucide-react';
+import { motion } from 'motion/react';
+import { useTheme } from '../../lib/ThemeContext';
+import { useBranding } from '../../lib/BrandingContext';
+import { apiRequest } from '../../lib/api';
+import { Plan } from '../../types';
+
+interface HomeProps {
+  onNavigate: (page: string) => void;
+}
+
+export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
+  const { accentClasses } = useTheme();
+  const { pageAnimationsEnabled, heroDescription } = useBranding();
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        const res = await apiRequest('/public/plans');
+        if (res.success && Array.isArray(res.data)) {
+          setPlans(res.data);
+        } else if (res.error) {
+          console.error('Failed to load plans on home:', res.error.message);
+        }
+      } catch (err: any) {
+        console.error('Failed to load plans on home:', err.message || err);
+      }
+    };
+
+    loadPlans();
+  }, []);
+
+  const mcPlans = plans.filter(p => p.productId === 'prod_minecraft' || p.id.startsWith('plan_mc_'));
+  const botPlans = plans.filter(p => p.productId === 'prod_bot' || p.id.startsWith('plan_bot_'));
+
+  const minMcPrice = mcPlans.length > 0
+    ? Math.min(...mcPlans.map(p => p.priceMonthly))
+    : 1.49;
+
+  const minBotPrice = botPlans.length > 0
+    ? Math.min(...botPlans.map(p => p.priceMonthly))
+    : 0.99;
+
+  const animate = pageAnimationsEnabled && !prefersReducedMotion;
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+        delayChildren: 0.05
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        type: 'spring',
+        stiffness: 120,
+        damping: 18,
+        mass: 0.8
+      }
+    }
+  };
+
+  const motionDivProps = animate ? {
+    variants: containerVariants,
+    initial: "hidden",
+    animate: "visible"
+  } : {};
+
+  const motionChildProps = animate ? {
+    variants: itemVariants
+  } : {};
+
+  return (
+    <motion.div {...motionDivProps} className="space-y-14 sm:space-y-18 py-4 sm:py-6 relative">
+      {/* Background Ambient Lighting (Layer 1-3: Smooth soft radial gradients, zero visible rectangular edges) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+        {/* Layer 2: Subtle warm radial amber/gold glow upper center */}
+        <div
+          className="absolute -top-36 left-1/2 -translate-x-1/2 w-[600px] sm:w-[850px] md:w-[1100px] h-[480px] rounded-full opacity-40 blur-[160px]"
+          style={{
+            background: 'radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(217, 119, 6, 0.07) 45%, rgba(0, 0, 0, 0) 70%)'
+          }}
+        />
+
+        {/* Layer 3: Very subtle teal/cyan ambient glow lower left side */}
+        <div
+          className="absolute top-48 -left-24 w-[350px] sm:w-[500px] h-[350px] rounded-full opacity-25 blur-[150px]"
+          style={{
+            background: 'radial-gradient(circle, rgba(20, 184, 166, 0.12) 0%, rgba(13, 148, 136, 0.04) 50%, rgba(0, 0, 0, 0) 75%)'
+          }}
+        />
+
+        {/* Layer 3b: Micro warm ambient glow right side for optical balance */}
+        <div
+          className="absolute top-96 -right-24 w-[350px] sm:w-[480px] h-[320px] rounded-full opacity-20 blur-[140px]"
+          style={{
+            background: 'radial-gradient(circle, rgba(245, 158, 11, 0.10) 0%, rgba(0, 0, 0, 0) 70%)'
+          }}
+        />
+      </div>
+
+      {/* Hero Section */}
+      <motion.section {...motionChildProps} className="relative px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1080px]">
+          <div className="text-center space-y-5 sm:space-y-6 max-w-3xl mx-auto">
+            
+            {/* Announcement Badge */}
+            <div>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-300 shadow-sm shadow-amber-500/5 backdrop-blur-sm">
+                <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span>New Infrastructure Upgrade — Up to 35% Faster TPS</span>
+              </div>
+            </div>
+
+            {/* Main Headline */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white font-sans leading-[1.12]">
+              Powerful Hosting.{' '}
+              <span className={`bg-gradient-to-r ${accentClasses.gradient} bg-clip-text text-transparent`}>
+                Without Complexity.
+              </span>
+            </h1>
+
+            {/* Description */}
+            <p className="text-sm sm:text-base md:text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+              {heroDescription}
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-1">
+              <button
+                onClick={() => onNavigate('pricing')}
+                className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r ${accentClasses.gradient} shadow-lg ${accentClasses.shadow} hover:opacity-95 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-sm`}
+              >
+                <span>View Plans & Pricing</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+
+              <button
+                onClick={() => onNavigate('status')}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl font-semibold text-zinc-300 bg-zinc-900/90 border border-zinc-800/80 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 text-sm shadow-sm"
+              >
+                <Globe2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span>Global Node Locations</span>
+              </button>
+            </div>
+
+            {/* Trust Indicators Row */}
+            <div className="pt-6 mt-2 border-t border-zinc-800/60 flex flex-wrap items-center justify-center gap-y-3 gap-x-6 sm:gap-x-8 text-xs text-zinc-400">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span className="font-medium text-zinc-300">99.99% Uptime SLA</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span className="font-medium text-zinc-300">Fast Account Setup</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span className="font-medium text-zinc-300">Free Subdomain & DDoS Filter</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span className="font-medium text-zinc-300">Automated File Backups</span>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Premium Infrastructure Showcase Panel */}
+          <div className="mt-10 sm:mt-12 max-w-5xl mx-auto">
+            <div className="relative rounded-2xl bg-zinc-950/70 border border-zinc-800/80 p-5 sm:p-6 lg:p-8 shadow-xl backdrop-blur-md overflow-hidden">
+              {/* Subtle top ambient gradient line */}
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-6 divide-y md:divide-y-0 md:divide-x divide-zinc-800/60">
+                {/* 1. Fast Onboarding */}
+                <div className="space-y-3 pt-3 md:pt-0 md:px-4 first:md:pl-0">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Zap className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Fast Onboarding
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Choose your plan and get set up in minutes with transparent pricing and simple account management.
+                  </p>
+                </div>
+
+                {/* 2. Performance Focused */}
+                <div className="space-y-3 pt-5 md:pt-0 md:px-4">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Cpu className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Performance Focused
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Flexible resource allocations and reliable infrastructure built for demanding workloads.
+                  </p>
+                </div>
+
+                {/* 3. Dedicated Support */}
+                <div className="space-y-3 pt-5 md:pt-0 md:px-4 last:md:pr-0">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Sliders className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Dedicated Support
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Our team handles setup, configuration, backups, and networking so you don't have to.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Infrastructure Built for Performance Section */}
+          <div className="mt-12 sm:mt-16 max-w-6xl mx-auto">
+            <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10 space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-sans">
+                Infrastructure Built for Performance
+              </h2>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Enterprise-grade hardware, ultra-low latency routing, and intuitive management tools designed for peak stability.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {/* Card 1: Fast Setup */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3 flex flex-col justify-between h-full">
+                <div className="space-y-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                    <Zap className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white">Fast Setup</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Pick a plan, complete checkout, and our team gets your Minecraft server or bot process online quickly.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 2: Reliable Infrastructure */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3 flex flex-col justify-between h-full">
+                <div className="space-y-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                    <Server className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white">Reliable Infrastructure</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Powered by high-clock compute hardware, enterprise Gen4 NVMe arrays, and dedicated DDoS protection for continuous uptime.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 3: Real Human Support */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3 flex flex-col justify-between h-full">
+                <div className="space-y-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                    <Cpu className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white">Real Human Support</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Get help from our support desk for setup questions, billing, and anything else — with tracked tickets and fast replies.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 4: Transparent Billing */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3 flex flex-col justify-between h-full">
+                <div className="space-y-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                    <Globe2 className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white">Transparent Billing</h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Track your balance, orders, and invoices in one dashboard, with instant and manual payment methods to choose from.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Product Category Showcase */}
+      <motion.section {...motionChildProps} className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10 space-y-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white font-sans">
+            Choose Your Hosting Product
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-400">
+            Tailored hardware configurations and optimized container runtimes for gaming and bot services.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+          
+          {/* Minecraft Card */}
+          <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-6 sm:p-8 space-y-6 hover:border-violet-500/40 hover:shadow-xl hover:shadow-violet-500/5 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-400 group-hover:scale-105 transition-transform">
+                  <Gamepad2 className="h-6 w-6 sm:h-7 sm:w-7" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Starts at ${minMcPrice.toFixed(2)}/mo
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-white">Minecraft Hosting</h3>
+                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                  Full support for Paper, Purpur, Spigot, Forge, Fabric, and Velocity networks, with performance tuning handled by our team.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 text-xs text-zinc-300">
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> High Single-Core Ryzen 9 7950X (5.7GHz)</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> Any Version Supported (1.8 to 1.20+)</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> Free MySQL/Postgres Database & Subdomain</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> Routine Backups & Uptime Monitoring</li>
+              </ul>
+            </div>
+
+            <button
+              onClick={() => onNavigate('minecraft')}
+              className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800/90 text-white hover:bg-violet-600 transition-colors flex items-center justify-center gap-2 mt-4"
+            >
+              <span>Explore Minecraft Plans</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Bot Hosting Card */}
+          <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-6 sm:p-8 space-y-6 hover:border-cyan-500/40 hover:shadow-xl hover:shadow-cyan-500/5 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 group-hover:scale-105 transition-transform">
+                  <Bot className="h-6 w-6 sm:h-7 sm:w-7" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Starts at ${minBotPrice.toFixed(2)}/mo
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-white">Discord Bot Hosting</h3>
+                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                  Persistent 24/7 background process manager for Discord, Telegram, and Twitch bots. Supporting Node.js (v18-v22), Python (3.9-3.12), Bun, and Go runtimes with auto-restart on crash.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 text-xs text-zinc-300">
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> 24/7 PM2-style Process Watchdog</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> Environment Variables & Secrets Manager</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> Setup & Configuration Support Included</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> Low Latency Connection to Discord Gateways</li>
+              </ul>
+            </div>
+
+            <button
+              onClick={() => onNavigate('bot')}
+              className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800/90 text-white hover:bg-cyan-600 transition-colors flex items-center justify-center gap-2 mt-4"
+            >
+              <span>Explore Discord Bot Plans</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+        </div>
+      </motion.section>
+
+      {/* Feature Highlights Grid */}
+      <motion.section {...motionChildProps} className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 border-t border-zinc-800/60 pt-12 sm:pt-16">
+        <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12 space-y-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white font-sans">
+            Engineered for Modern Game Infrastructure
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-400">
+            Built from the ground up to prevent downtime, reduce latency, and back every plan with real infrastructure and real support.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          
+          <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3">
+            <div className="h-10 w-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 shrink-0">
+              <Cpu className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-white">AMD Ryzen 9 CPUs</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Equipped with Ryzen 9 7950X processors boosting up to 5.7GHz to deliver smooth 20.0 TPS even under heavy player loads.
+            </p>
+          </div>
+
+          <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3">
+            <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-white">3.2 Tbps DDoS Shield</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Always-on hardware mitigation filters layer 3, 4, and 7 attacks so your game network stays online uninterrupted.
+            </p>
+          </div>
+
+          <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+              <HardDrive className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-white">Gen4 NVMe Storage</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Enterprise PCIe 4.0 NVMe SSDs deliver 7,000 MB/s read speeds for instant chunk rendering and sub-second boot times.
+            </p>
+          </div>
+
+          <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3">
+            <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+              <Terminal className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-white">Managed by Our Team</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Setup, configuration, and ongoing maintenance handled for you, so you can focus on your community, not the infrastructure.
+            </p>
+          </div>
+
+          <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3">
+            <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+              <Clock className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-white">Routine Backups</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Regular backups and world saves keep your data safe, with restore requests handled quickly by our support team.
+            </p>
+          </div>
+
+          <div className="p-5 sm:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 space-y-3">
+            <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+              <Globe2 className="h-5 w-5" />
+            </div>
+            <h3 className="text-base font-bold text-white">Multi-Region Locations</h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Choose infrastructure close to your players across US East (Virginia), EU Central (Frankfurt), or Asia Pacific (Singapore).
+            </p>
+          </div>
+
+        </div>
+      </motion.section>
+
+      {/* CTA Banner */}
+      <motion.section {...motionChildProps} className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="rounded-3xl bg-gradient-to-r from-violet-950/30 via-zinc-900/90 to-cyan-950/30 border border-zinc-800/80 p-8 sm:p-12 text-center space-y-5 shadow-2xl relative overflow-hidden">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
+            Ready to Launch Your Server?
+          </h2>
+          <p className="text-zinc-400 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
+            Join thousands of server owners and bot developers hosting on AetherPanel today. Free migration assistance available.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
+            <button
+              onClick={() => onNavigate('register')}
+              className={`w-full sm:w-auto px-8 py-3.5 rounded-xl font-semibold text-white bg-gradient-to-r ${accentClasses.gradient} shadow-lg ${accentClasses.shadow} hover:opacity-95 hover:scale-[1.01] active:scale-[0.99] transition-all text-sm`}
+            >
+              Create Free Account
+            </button>
+            <button
+              onClick={() => onNavigate('pricing')}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-semibold text-zinc-300 bg-zinc-900/90 border border-zinc-800/80 hover:text-white hover:bg-zinc-800 hover:scale-[1.01] active:scale-[0.99] transition-all text-sm"
+            >
+              Browse All Plans
+            </button>
+          </div>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+};
