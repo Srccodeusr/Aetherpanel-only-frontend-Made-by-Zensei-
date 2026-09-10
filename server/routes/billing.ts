@@ -1,6 +1,9 @@
 import { Router, Response } from 'express';
 import { getDb, saveDbSync } from '../db';
 import { authMiddleware, createAuditLog, AuthenticatedRequest } from '../auth';
+import { createProvisionRecord, runProvisioning } from '../services/provisioningService';
+import { peekEphemeralSecret } from '../services/ephemeralSecrets';
+import { Order } from '../../src/types';
 
 const router = Router();
 
@@ -151,6 +154,145 @@ router.post('/add-credits', authMiddleware, async (req: AuthenticatedRequest, re
     success: true,
     message: `Successfully added $${numAmount.toFixed(2)} to account credits balance.`,
     data: { newBalance: user.credits, order }
+  });
+});
+
+// POST /api/v1/billing/checkout - Purchase a plan (or claim a free plan) with account credits,
+// then kick off panel account + server auto-provisioning in the background.
+router.post('/checkout', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const { planId, billingCycle, couponCode } = req.body || {};
+
+  if (!planId) {
+    return res.status(400).json({ success: false, error: { code: 'PLAN_REQUIRED', message: 'A plan is required to check out.' } });
+  }
+  const cycle: 'monthly' | 'yearly' = billingCycle === 'yearly' ? 'yearly' : 'monthly';
+
+  const db = await getDb();
+  const plan = db.plans.find(p => p.id === planId && p.isActive);
+  if (!plan) {
+    return res.status(404).json({ success: false, error: { code: 'PLAN_NOT_FOUND', message: 'That plan is not available.' } });
+  }
+  const product = db.products.find(p => p.id === plan.productId);
+  if (!product) {
+    return res.status(404).json({ success: false, error: { code: 'PRODUCT_NOT_FOUND', message: 'That plan has no associated product.' } });
+  }
+
+  const user = db.users.find(u => u.id === req.user!.id);
+  if (!user) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
+
+  // Enforce the plan's server-slot limit using this user's provisioning history for this plan.
+  const activeStatuses = new Set(['pending', 'creating_account', 'creating_server', 'completed', 'awaiting_manual_setup']);
+  const existingForPlan = db.provisions.filter(p => p.userId === user.id && p.planId === plan.id && activeStatuses.has(p.status)).length;
+  if (plan.serverLimit && existingForPlan >= plan.serverLimit) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'PLAN_LIMIT_REACHED', message: `You've already reached the server limit (${plan.serverLimit}) for the '${plan.name}' plan.` }
+    });
+  }
+
+  let price = cycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
+  let appliedCoupon: { code: string; discountType: 'percent' | 'fixed'; discountValue: number } | null = null;
+
+  if (couponCode && couponCode.trim()) {
+    const coupon = db.coupons.find(c => c.code.toUpperCase() === couponCode.trim().toUpperCase() && c.isActive);
+    if (!coupon) {
+      return res.status(404).json({ success: false, error: { code: 'INVALID_COUPON', message: 'Invalid or expired promotional code.' } });
+    }
+    if (coupon.usageLimit && coupon.timesUsed >= coupon.usageLimit) {
+      return res.status(400).json({ success: false, error: { code: 'COUPON_EXHAUSTED', message: 'Promotional code has reached its maximum usage limit.' } });
+    }
+    price = coupon.discountType === 'percent'
+      ? parseFloat((price * (1 - coupon.discountValue / 100)).toFixed(2))
+      : Math.max(0, parseFloat((price - coupon.discountValue).toFixed(2)));
+    coupon.timesUsed = (coupon.timesUsed || 0) + 1;
+    appliedCoupon = { code: coupon.code, discountType: coupon.discountType, discountValue: coupon.discountValue };
+  }
+
+  if (price > 0 && user.credits < price) {
+    return res.status(402).json({
+      success: false,
+      error: {
+        code: 'INSUFFICIENT_CREDITS',
+        message: `You need $${price.toFixed(2)} in account credits for this plan, but your balance is $${user.credits.toFixed(2)}. Add $${(price - user.credits).toFixed(2)} more to continue.`
+      }
+    });
+  }
+
+  if (price > 0) {
+    user.credits = parseFloat((user.credits - price).toFixed(2));
+  }
+  user.plan = plan.id;
+  user.updatedAt = new Date().toISOString();
+
+  const order: Order = {
+    id: `ord_${Date.now()}`,
+    userId: user.id,
+    userEmail: user.email,
+    planId: plan.id,
+    planName: plan.name,
+    productId: product.id,
+    billingCycle: cycle,
+    amount: price,
+    currency: db.settings.currencyCode || 'USD',
+    status: 'paid',
+    paymentMethod: price > 0 ? 'Account Credits' : 'Free Plan',
+    adminNote: appliedCoupon ? `Coupon '${appliedCoupon.code}' applied (${appliedCoupon.discountType === 'percent' ? appliedCoupon.discountValue + '%' : '$' + appliedCoupon.discountValue} off)` : undefined,
+    provisionId: undefined,
+    createdAt: new Date().toISOString()
+  };
+  db.orders.unshift(order);
+  saveDbSync();
+
+  await createAuditLog(user.id, user.email, user.role, 'PLAN_PURCHASED', order.id, `Purchased plan '${plan.name}' (${cycle}) for $${price.toFixed(2)}`);
+
+  const provisionRecord = await createProvisionRecord(order, user, plan, product);
+  order.provisionId = provisionRecord.id;
+  saveDbSync();
+
+  // Fire-and-forget: this performs the panel account + server creation and updates
+  // the provision record as it goes. The client polls GET /billing/provision/:id.
+  runProvisioning(provisionRecord.id).catch(() => { /* runProvisioning already handles its own errors */ });
+
+  res.json({
+    success: true,
+    message: price > 0 ? `Payment of $${price.toFixed(2)} confirmed.` : 'Free plan activated.',
+    data: { order, provisionId: provisionRecord.id, newBalance: user.credits }
+  });
+});
+
+// GET /api/v1/billing/provision/:id - Poll provisioning status for the checkout loading screen
+router.get('/provision/:id', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const record = db.provisions.find(p => p.id === req.params.id);
+  if (!record) {
+    return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Provisioning record not found.' } });
+  }
+
+  const isOwner = record.userId === req.user!.id;
+  const isStaff = ['admin', 'super_admin', 'support', 'moderator'].includes(req.user!.role);
+  if (!isOwner && !isStaff) {
+    return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'You do not have access to this order.' } });
+  }
+
+  // The plaintext panel password (if one was generated) lives only in memory,
+  // never on disk — see server/services/ephemeralSecrets.ts.
+  const panelPassword = record.status === 'completed' ? peekEphemeralSecret(`panel_pw:${record.id}`) : null;
+
+  res.json({
+    success: true,
+    data: {
+      id: record.id,
+      status: record.status,
+      message: record.message,
+      planName: record.planName,
+      productName: record.productName,
+      panelUrl: record.panelUrl,
+      panelUsername: record.panelUsername,
+      panelPassword: panelPassword || undefined,
+      panelServerName: record.panelServerName,
+      errorMessage: isStaff ? record.errorMessage : undefined,
+      updatedAt: record.updatedAt
+    }
   });
 });
 
