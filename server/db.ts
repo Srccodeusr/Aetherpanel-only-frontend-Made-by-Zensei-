@@ -8,7 +8,8 @@ import {
   AdItem, AdEvent,
   DiscordAccount, DiscordAuditLog,
   ApiKey, ApiAuditLog, WebhookSubscription, LegalPage,
-  StatusComponent, Incident, ScheduledMaintenance
+  StatusComponent, Incident, ScheduledMaintenance,
+  ProvisionRecord, PanelIntegrationSettings
 } from '../src/types';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -37,6 +38,7 @@ export interface DatabaseSchema {
   statusComponents: StatusComponent[];
   incidents: Incident[];
   scheduledMaintenances: ScheduledMaintenance[];
+  provisions: ProvisionRecord[];
 }
 
 const defaultProducts: Product[] = [
@@ -225,7 +227,26 @@ const defaultSettings: SystemSettings = {
   },
   socialLinks: { discord: '', twitter: '', github: '' },
   heroDescription: '',
-  footerDescription: ''
+  footerDescription: '',
+  panelIntegration: {
+    enabled: false,
+    panelUrl: '',
+    apiKey: '',
+    defaultLocationIds: [],
+    autoCreateAccount: true,
+    autoCreateServer: true,
+    startServerOnCompletion: true
+  }
+};
+
+const defaultPanelIntegration: PanelIntegrationSettings = {
+  enabled: false,
+  panelUrl: '',
+  apiKey: '',
+  defaultLocationIds: [],
+  autoCreateAccount: true,
+  autoCreateServer: true,
+  startServerOnCompletion: true
 };
 
 const defaultStatusComponents: StatusComponent[] = [
@@ -294,7 +315,8 @@ function defaultDb(): DatabaseSchema {
     legalPages: [],
     statusComponents: defaultStatusComponents,
     incidents: [],
-    scheduledMaintenances: []
+    scheduledMaintenances: [],
+    provisions: []
   };
 }
 
@@ -366,6 +388,12 @@ export async function getDb(reload = false): Promise<DatabaseSchema> {
         if (!dbCache.statusComponents || dbCache.statusComponents.length === 0) dbCache.statusComponents = defaultStatusComponents;
         if (!dbCache.incidents) dbCache.incidents = [];
         if (!dbCache.scheduledMaintenances) dbCache.scheduledMaintenances = [];
+        if (!dbCache.provisions) dbCache.provisions = [];
+        if (!dbCache.settings.panelIntegration) {
+          dbCache.settings.panelIntegration = defaultPanelIntegration;
+        } else {
+          dbCache.settings.panelIntegration = { ...defaultPanelIntegration, ...dbCache.settings.panelIntegration };
+        }
         if (!dbCache.installationId) dbCache.installationId = getInstallationId();
       } else {
         dbCache = defaultDb();
