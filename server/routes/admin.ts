@@ -5,6 +5,8 @@ import { authMiddleware, requireRole, AuthenticatedRequest, createAuditLog } fro
 import { User, Product, Plan, Coupon, Announcement } from '../../src/types';
 import { getDiscordOAuthRedirectUri } from '../oauthUrlResolver';
 import { testIpRiskConnection } from '../utils/ipRiskProvider';
+import { getEgg, testPanelConnection, PanelApiError } from '../services/panelService';
+import { runProvisioning } from '../services/provisioningService';
 
 const router = Router();
 
@@ -292,6 +294,67 @@ router.post('/products', async (req: AuthenticatedRequest, res: Response) => {
   saveDbSync();
 
   res.json({ success: true, data: newProd });
+});
+
+// PUT /api/v1/admin/products/:id - Update a product, including its panel/egg deployment mapping
+router.put('/products/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const product = db.products.find(p => p.id === req.params.id);
+  if (!product) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Product not found' } });
+
+  const {
+    name, slug, description, category, icon, isActive, sortOrder,
+    panelNestId, panelEggId, panelDockerImage, panelStartupCommand, panelEnvironment, panelLocationIds
+  } = req.body || {};
+
+  if (name !== undefined) product.name = name;
+  if (slug !== undefined) product.slug = slug;
+  if (description !== undefined) product.description = description;
+  if (category !== undefined) product.category = category;
+  if (icon !== undefined) product.icon = icon;
+  if (isActive !== undefined) product.isActive = !!isActive;
+  if (sortOrder !== undefined) product.sortOrder = Number(sortOrder);
+
+  if (panelNestId !== undefined) product.panelNestId = panelNestId === '' || panelNestId === null ? null : Number(panelNestId);
+  if (panelEggId !== undefined) product.panelEggId = panelEggId === '' || panelEggId === null ? null : Number(panelEggId);
+  if (panelDockerImage !== undefined) product.panelDockerImage = panelDockerImage;
+  if (panelStartupCommand !== undefined) product.panelStartupCommand = panelStartupCommand;
+  if (panelEnvironment !== undefined) product.panelEnvironment = panelEnvironment;
+  if (panelLocationIds !== undefined) {
+    product.panelLocationIds = Array.isArray(panelLocationIds)
+      ? panelLocationIds.map((n: any) => Number(n)).filter((n: number) => !isNaN(n))
+      : [];
+  }
+
+  saveDbSync();
+
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_UPDATE_PRODUCT', product.id, `Updated product '${product.name}' (panel egg mapping: nest ${product.panelNestId ?? 'none'} / egg ${product.panelEggId ?? 'none'})`);
+  res.json({ success: true, data: product, message: 'Product updated' });
+});
+
+// POST /api/v1/admin/products/:id/test-egg - Verify the mapped nest/egg exists on the linked panel
+router.post('/products/:id/test-egg', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const product = db.products.find(p => p.id === req.params.id);
+  if (!product) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Product not found' } });
+
+  const settings = db.settings.panelIntegration;
+  if (!settings?.panelUrl || !settings?.apiKey) {
+    return res.status(400).json({ success: false, error: { code: 'PANEL_NOT_CONFIGURED', message: 'Link your panel first under Platform Settings -> Link your panel.' } });
+  }
+  if (!product.panelNestId || !product.panelEggId) {
+    return res.status(400).json({ success: false, error: { code: 'MAPPING_INCOMPLETE', message: 'Set a Nest ID and Egg ID for this product first.' } });
+  }
+
+  try {
+    const egg = await getEgg({ panelUrl: settings.panelUrl, apiKey: settings.apiKey }, product.panelNestId, product.panelEggId);
+    if (!egg) {
+      return res.status(404).json({ success: false, error: { code: 'EGG_NOT_FOUND', message: `No egg with ID ${product.panelEggId} was found in nest ${product.panelNestId} on the panel.` } });
+    }
+    res.json({ success: true, message: `Found egg '${egg.name}' on the panel.`, data: egg });
+  } catch (err: any) {
+    res.status(502).json({ success: false, error: { code: 'PANEL_ERROR', message: err.message || 'Failed to reach the panel.' } });
+  }
 });
 
 // GET /api/v1/admin/plans
@@ -1050,6 +1113,100 @@ router.put('/settings/appearance', async (req: AuthenticatedRequest, res: Respon
   );
 
   res.json({ success: true, message: 'Animation settings updated successfully.', data: db.settings.animationSettings });
+});
+
+// --- EXTERNAL PANEL INTEGRATION ("Link your panel") ---
+const MASKED_SECRET = '••••••••••••••••';
+
+// GET /api/v1/admin/panel-settings
+router.get('/panel-settings', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const settings = db.settings.panelIntegration || {
+    enabled: false, panelUrl: '', apiKey: '', defaultLocationIds: [],
+    autoCreateAccount: true, autoCreateServer: true, startServerOnCompletion: true
+  };
+  res.json({
+    success: true,
+    data: { ...settings, apiKey: settings.apiKey ? MASKED_SECRET : '' }
+  });
+});
+
+// PUT /api/v1/admin/panel-settings
+router.put('/panel-settings', async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'super_admin') {
+    return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Admin permissions required' } });
+  }
+
+  const db = await getDb();
+  const existing = db.settings.panelIntegration || {
+    enabled: false, panelUrl: '', apiKey: '', defaultLocationIds: [],
+    autoCreateAccount: true, autoCreateServer: true, startServerOnCompletion: true
+  };
+  const incoming = req.body || {};
+
+  const newApiKey = incoming.apiKey && !incoming.apiKey.includes('••••') ? incoming.apiKey.trim() : existing.apiKey;
+
+  db.settings.panelIntegration = {
+    enabled: typeof incoming.enabled === 'boolean' ? incoming.enabled : existing.enabled,
+    panelUrl: typeof incoming.panelUrl === 'string' ? incoming.panelUrl.trim().replace(/\/+$/, '') : existing.panelUrl,
+    apiKey: newApiKey,
+    defaultLocationIds: Array.isArray(incoming.defaultLocationIds)
+      ? incoming.defaultLocationIds.map((n: any) => Number(n)).filter((n: number) => !isNaN(n))
+      : existing.defaultLocationIds,
+    autoCreateAccount: typeof incoming.autoCreateAccount === 'boolean' ? incoming.autoCreateAccount : existing.autoCreateAccount,
+    autoCreateServer: typeof incoming.autoCreateServer === 'boolean' ? incoming.autoCreateServer : existing.autoCreateServer,
+    startServerOnCompletion: typeof incoming.startServerOnCompletion === 'boolean' ? incoming.startServerOnCompletion : existing.startServerOnCompletion
+  };
+  saveDbSync();
+
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_UPDATE_PANEL_SETTINGS', 'PANEL_INTEGRATION', `Updated linked panel settings (URL: ${db.settings.panelIntegration.panelUrl || 'none'}, Enabled: ${db.settings.panelIntegration.enabled})`);
+
+  res.json({ success: true, message: 'Panel connection settings saved.', data: { ...db.settings.panelIntegration, apiKey: db.settings.panelIntegration.apiKey ? MASKED_SECRET : '' } });
+});
+
+// POST /api/v1/admin/panel-settings/test - Verify the panel URL + API key work
+router.post('/panel-settings/test', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const settings = db.settings.panelIntegration;
+  if (!settings?.panelUrl || !settings?.apiKey) {
+    return res.status(400).json({ success: false, error: { code: 'PANEL_NOT_CONFIGURED', message: 'Set a panel URL and API key first, then save before testing.' } });
+  }
+
+  try {
+    const result = await testPanelConnection({ panelUrl: settings.panelUrl, apiKey: settings.apiKey });
+    res.json({ success: true, message: 'Connected to the panel successfully.', data: result });
+  } catch (err: any) {
+    const message = err instanceof PanelApiError ? err.message : (err.message || 'Failed to reach the panel.');
+    res.status(502).json({ success: false, error: { code: 'PANEL_CONNECTION_FAILED', message } });
+  }
+});
+
+// GET /api/v1/admin/provisions - Recent panel account/server provisioning activity
+router.get('/provisions', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const statusFilter = req.query.status as string;
+  let provisions = db.provisions || [];
+  if (statusFilter) provisions = provisions.filter(p => p.status === statusFilter);
+  res.json({ success: true, data: provisions.slice(0, 200) });
+});
+
+// POST /api/v1/admin/provisions/:id/retry - Re-run provisioning for a failed / manually-pending order
+router.post('/provisions/:id/retry', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const record = db.provisions.find(p => p.id === req.params.id);
+  if (!record) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Provisioning record not found' } });
+
+  record.status = 'pending';
+  record.message = 'Retrying setup...';
+  record.errorMessage = undefined;
+  record.updatedAt = new Date().toISOString();
+  saveDbSync();
+
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_RETRY_PROVISION', record.id, `Retried panel provisioning for order ${record.orderId} (${record.userEmail})`);
+
+  runProvisioning(record.id).catch(() => { /* handled internally */ });
+
+  res.json({ success: true, message: 'Retrying provisioning now.', data: record });
 });
 
 export default router;
