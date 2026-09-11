@@ -57,6 +57,7 @@ export function parseUrlToRoute(pathname: string, search: string): RouteState {
     if (sub === 'announcements') return { page: 'admin-announcements', params: queryObj };
     if (sub === 'ads') return { page: 'admin-ads', params: queryObj };
     if (sub === 'discord' || sub === 'bot') return { page: 'admin-discord', params: queryObj };
+    if (sub === 'panel-link' || sub === 'panel' || sub === 'panel-integration') return { page: 'admin-panel-link', params: queryObj };
     if (sub === 'appearance' || sub === 'fonts-themes' || sub === 'theme') return { page: 'admin-appearance', params: queryObj };
     if (sub === 'support') return { page: 'admin-support', params: queryObj };
     if (sub === 'audit-logs' || sub === 'logs') return { page: 'admin-audit-logs', params: queryObj };
@@ -112,6 +113,7 @@ export function routeToUrl(page: string, params?: Record<string, any>): string {
     case 'admin-announcements': return `/admin/announcements${formatQuery(params)}`;
     case 'admin-ads': return `/admin/ads${formatQuery(params)}`;
     case 'admin-discord': return `/admin/discord${formatQuery(params)}`;
+    case 'admin-panel-link': return `/admin/panel-link${formatQuery(params)}`;
     case 'admin-appearance': return `/admin/appearance${formatQuery(params)}`;
     case 'admin-legal': return `/admin/legal${formatQuery(params)}`;
     case 'admin-support': return `/admin/support${formatQuery(params)}`;
