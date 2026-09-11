@@ -53,6 +53,29 @@ export interface UserAllocationStatus {
 
 export type ProductCategory = 'minecraft' | 'bot' | 'other';
 
+// A selectable application/egg a customer can deploy for this product
+// (e.g. "Node.js", "Python"). Internals (nestId/eggId/dockerImage/startup/
+// environment) are admin-only and never sent to the public API.
+export interface PanelEggOption {
+  id: string;
+  label: string;
+  nestId: number;
+  eggId: number;
+  dockerImage?: string;
+  startupCommand?: string;
+  environment?: Record<string, string>;
+}
+
+// A selectable deploy location/node a customer can choose (e.g. "Germany",
+// tagged free/paid). locationId (the panel's numeric location ID) is
+// admin-only and never sent to the public API.
+export interface PanelLocationOption {
+  id: string;
+  label: string;
+  locationId: number;
+  tier?: 'free' | 'paid';
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -62,14 +85,12 @@ export interface Product {
   icon: string;
   isActive: boolean;
   sortOrder: number;
-  // Panel deployment mapping: which egg/nest in the external hosting panel
-  // (e.g. Pterodactyl/Pelican) is used to auto-create a server for this category.
-  panelNestId?: number | null;
-  panelEggId?: number | null;
-  panelDockerImage?: string;
-  panelStartupCommand?: string;
-  panelEnvironment?: Record<string, string>;
-  panelLocationIds?: number[];
+  // Panel deployment options: the admin configures one or more egg
+  // (application) choices and one or more location/node choices for this
+  // product. At checkout the customer picks one of each — auto-selected
+  // when there's only one, otherwise they choose.
+  panelEggOptions?: PanelEggOption[];
+  panelLocationOptions?: PanelLocationOption[];
 }
 
 export interface Plan {
@@ -573,6 +594,13 @@ export interface Order {
   proofUrl?: string;
   adminNote?: string;
   provisionId?: string;
+  // Customer's deployment choices at checkout (see Product.panelEggOptions /
+  // panelLocationOptions) — undefined when the product has 0 or 1 of a given
+  // option, since there was nothing to choose.
+  serverName?: string;
+  serverDescription?: string;
+  selectedEggOptionId?: string;
+  selectedLocationOptionId?: string;
   createdAt: string;
 }
 
@@ -614,6 +642,12 @@ export interface ProvisionRecord {
   panelServerIdentifier?: string;
   panelServerName?: string;
   panelUrl?: string;
+  // Customer's deployment choices, carried over from the order so retries
+  // use the same selections.
+  serverName?: string;
+  serverDescription?: string;
+  selectedEggOptionId?: string;
+  selectedLocationOptionId?: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
