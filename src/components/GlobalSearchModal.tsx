@@ -3,7 +3,7 @@ import {
   Search, Shield, HelpCircle,
   Activity, User, Sparkles, BookOpen,
   CreditCard, Tag, ArrowRight, X, Package,
-  Users, Megaphone, ShoppingBag, MessageSquare
+  Users, Megaphone, ShoppingBag, MessageSquare, Link2
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
@@ -132,6 +132,14 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
           category: 'admin',
           icon: ShoppingBag,
           action: () => onNavigate('admin-billing')
+        },
+        {
+          id: 'admin_panel_link',
+          title: 'Panel Integration',
+          subtitle: 'Link your hosting panel and monitor auto-provisioning',
+          category: 'admin',
+          icon: Link2,
+          action: () => onNavigate('admin-panel-link')
         },
         {
           id: 'admin_coupons',

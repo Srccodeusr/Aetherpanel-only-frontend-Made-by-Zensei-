@@ -5,7 +5,7 @@ import {
   Sparkles, Search, Menu, X, LayoutDashboard, CreditCard, LifeBuoy,
   Settings, LogOut, Sliders, Users, Package,
   Megaphone, ShoppingBag, MessageSquare, Palette, FileText,
-  Tag, Key, Scale
+  Tag, Key, Scale, Link2
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
@@ -314,6 +314,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                           className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-billing' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
                         >
                           <ShoppingBag className="h-4 w-4" /> Orders & Billing
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleNav('admin-panel-link')}
+                          className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-panel-link' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
+                        >
+                          <Link2 className="h-4 w-4" /> Panel Integration
                         </button>
                         <button
                           type="button"

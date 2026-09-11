@@ -2,7 +2,7 @@ import React from 'react';
 import {
   ShieldAlert, Users, Package, ShoppingBag,
   Tag, Megaphone, LifeBuoy, FileText, Sliders, ArrowLeft, LogOut,
-  Sparkles, MessageSquare, Scale, Key
+  Sparkles, MessageSquare, Scale, Key, Link2
 } from 'lucide-react';
 
 import { useAuth } from '../lib/AuthContext';
@@ -59,6 +59,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentPage, onNavig
           >
             <ShoppingBag className="h-4 w-4" />
             <span>Orders & Billing</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('admin-panel-link')}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${currentPage === 'admin-panel-link' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+          >
+            <Link2 className="h-4 w-4" />
+            <span>Panel Integration</span>
           </button>
 
           <button
