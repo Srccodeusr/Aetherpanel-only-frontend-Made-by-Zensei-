@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Edit, Trash2, Check, X, RefreshCw, Layers, ShieldCheck, Server, Link2 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
-import { Plan, Product } from '../../types';
+import { Plan, Product, PanelEggOption, PanelLocationOption } from '../../types';
 
 export const AdminProducts: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -25,17 +25,15 @@ export const AdminProducts: React.FC = () => {
   const [serverLimit, setServerLimit] = useState(1);
   const [isPopular, setIsPopular] = useState(false);
 
-  // Panel Egg Mapping Modal (per product category)
+  // Panel Deployment Mapping Modal (per product category) — lists of
+  // customer-selectable egg (application) and location/node options.
   const [showEggModal, setShowEggModal] = useState(false);
   const [eggModalProduct, setEggModalProduct] = useState<Product | null>(null);
-  const [panelNestId, setPanelNestId] = useState('');
-  const [panelEggId, setPanelEggId] = useState('');
-  const [panelDockerImage, setPanelDockerImage] = useState('');
-  const [panelStartupCommand, setPanelStartupCommand] = useState('');
-  const [panelLocationIdsInput, setPanelLocationIdsInput] = useState('');
+  const [eggOptionsDraft, setEggOptionsDraft] = useState<PanelEggOption[]>([]);
+  const [locationOptionsDraft, setLocationOptionsDraft] = useState<PanelLocationOption[]>([]);
   const [savingEggMapping, setSavingEggMapping] = useState(false);
-  const [testingEggProductId, setTestingEggProductId] = useState<string | null>(null);
-  const [eggTestResult, setEggTestResult] = useState<{ productId: string; type: 'success' | 'error'; text: string } | null>(null);
+  const [testingOptionId, setTestingOptionId] = useState<string | null>(null);
+  const [eggTestResults, setEggTestResults] = useState<Record<string, { type: 'success' | 'error'; text: string }>>({});
 
   // Feedback notification
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -161,15 +159,33 @@ export const AdminProducts: React.FC = () => {
     selectedProductFilter === 'all' || p.productId === selectedProductFilter
   );
 
+  const genOptionId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
   const handleOpenEggModal = (prod: Product) => {
     setEggModalProduct(prod);
-    setPanelNestId(prod.panelNestId != null ? String(prod.panelNestId) : '');
-    setPanelEggId(prod.panelEggId != null ? String(prod.panelEggId) : '');
-    setPanelDockerImage(prod.panelDockerImage || '');
-    setPanelStartupCommand(prod.panelStartupCommand || '');
-    setPanelLocationIdsInput((prod.panelLocationIds || []).join(', '));
-    setEggTestResult(null);
+    setEggOptionsDraft((prod.panelEggOptions || []).map(o => ({ ...o })));
+    setLocationOptionsDraft((prod.panelLocationOptions || []).map(o => ({ ...o })));
     setShowEggModal(true);
+  };
+
+  const addEggOption = () => {
+    setEggOptionsDraft(prev => [...prev, { id: genOptionId('egg'), label: '', nestId: 0, eggId: 0, dockerImage: '', startupCommand: '' }]);
+  };
+  const updateEggOption = (id: string, patch: Partial<PanelEggOption>) => {
+    setEggOptionsDraft(prev => prev.map(o => (o.id === id ? { ...o, ...patch } : o)));
+  };
+  const removeEggOption = (id: string) => {
+    setEggOptionsDraft(prev => prev.filter(o => o.id !== id));
+  };
+
+  const addLocationOption = () => {
+    setLocationOptionsDraft(prev => [...prev, { id: genOptionId('loc'), label: '', locationId: 0 }]);
+  };
+  const updateLocationOption = (id: string, patch: Partial<PanelLocationOption>) => {
+    setLocationOptionsDraft(prev => prev.map(o => (o.id === id ? { ...o, ...patch } : o)));
+  };
+  const removeLocationOption = (id: string) => {
+    setLocationOptionsDraft(prev => prev.filter(o => o.id !== id));
   };
 
   const handleSaveEggMapping = async (e: React.FormEvent) => {
@@ -177,19 +193,22 @@ export const AdminProducts: React.FC = () => {
     if (!eggModalProduct) return;
     setSavingEggMapping(true);
 
-    const panelLocationIds = panelLocationIdsInput
-      .split(',')
-      .map(s => parseInt(s.trim(), 10))
-      .filter(n => !isNaN(n));
-
     const res = await apiRequest(`/admin/products/${eggModalProduct.id}`, {
       method: 'PUT',
       body: JSON.stringify({
-        panelNestId: panelNestId.trim() === '' ? null : Number(panelNestId),
-        panelEggId: panelEggId.trim() === '' ? null : Number(panelEggId),
-        panelDockerImage: panelDockerImage.trim(),
-        panelStartupCommand: panelStartupCommand.trim(),
-        panelLocationIds
+        panelEggOptions: eggOptionsDraft
+          .filter(o => o.label.trim() && o.nestId && o.eggId)
+          .map(o => ({
+            id: o.id,
+            label: o.label.trim(),
+            nestId: Number(o.nestId),
+            eggId: Number(o.eggId),
+            dockerImage: o.dockerImage?.trim() || undefined,
+            startupCommand: o.startupCommand?.trim() || undefined
+          })),
+        panelLocationOptions: locationOptionsDraft
+          .filter(o => o.label.trim() && o.locationId)
+          .map(o => ({ id: o.id, label: o.label.trim(), locationId: Number(o.locationId), tier: o.tier }))
       })
     });
 
@@ -203,16 +222,24 @@ export const AdminProducts: React.FC = () => {
     setSavingEggMapping(false);
   };
 
-  const handleTestEgg = async (prod: Product) => {
-    setTestingEggProductId(prod.id);
-    setEggTestResult(null);
-    const res = await apiRequest(`/admin/products/${prod.id}/test-egg`, { method: 'POST' });
-    if (res.success) {
-      setEggTestResult({ productId: prod.id, type: 'success', text: res.message || 'Egg found on the panel.' });
-    } else {
-      setEggTestResult({ productId: prod.id, type: 'error', text: res.error?.message || 'Test failed.' });
-    }
-    setTestingEggProductId(null);
+  const handleTestEggOption = async (productId: string, optionId: string) => {
+    setTestingOptionId(optionId);
+    setEggTestResults(prev => {
+      const next = { ...prev };
+      delete next[optionId];
+      return next;
+    });
+    const res = await apiRequest(`/admin/products/${productId}/test-egg`, {
+      method: 'POST',
+      body: JSON.stringify({ optionId })
+    });
+    setEggTestResults(prev => ({
+      ...prev,
+      [optionId]: res.success
+        ? { type: 'success', text: res.message || 'Egg found on the panel.' }
+        : { type: 'error', text: res.error?.message || 'Test failed.' }
+    }));
+    setTestingOptionId(null);
   };
 
   return (
@@ -268,16 +295,19 @@ export const AdminProducts: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {products.map((prod) => {
-              const isMapped = !!(prod.panelNestId && prod.panelEggId);
-              const testResult = eggTestResult?.productId === prod.id ? eggTestResult : null;
+              const eggOpts = prod.panelEggOptions || [];
+              const locOpts = prod.panelLocationOptions || [];
+              const isMapped = eggOpts.length > 0;
 
               return (
                 <div key={prod.id} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-xs font-bold text-white">{prod.name}</p>
-                      <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
-                        {isMapped ? `Nest ${prod.panelNestId} / Egg ${prod.panelEggId}` : 'Not mapped — orders fall back to manual setup'}
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                        {isMapped
+                          ? `${eggOpts.length} application option${eggOpts.length > 1 ? 's' : ''} · ${locOpts.length} location option${locOpts.length === 1 ? '' : 's'}`
+                          : 'Not mapped — orders fall back to manual setup'}
                       </p>
                     </div>
                     <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono border ${isMapped ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
@@ -285,28 +315,48 @@ export const AdminProducts: React.FC = () => {
                     </span>
                   </div>
 
-                  {testResult && (
-                    <p className={`text-[11px] p-2 rounded-lg border flex items-center gap-1.5 ${testResult.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
-                      {testResult.type === 'success' ? <ShieldCheck className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
-                      {testResult.text}
+                  {eggOpts.length > 0 && (
+                    <div className="space-y-1.5">
+                      {eggOpts.map(opt => {
+                        const result = eggTestResults[opt.id];
+                        return (
+                          <div key={opt.id} className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="flex-1 text-[11px] text-zinc-300 font-mono truncate">
+                                {opt.label} <span className="text-zinc-600">(nest {opt.nestId} / egg {opt.eggId})</span>
+                              </span>
+                              <button
+                                onClick={() => handleTestEggOption(prod.id, opt.id)}
+                                disabled={testingOptionId === opt.id}
+                                className="shrink-0 px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-semibold disabled:opacity-40"
+                              >
+                                {testingOptionId === opt.id ? 'Testing...' : 'Test'}
+                              </button>
+                            </div>
+                            {result && (
+                              <p className={`text-[10px] px-2 py-1 rounded-lg border flex items-center gap-1.5 ${result.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                                {result.type === 'success' ? <ShieldCheck className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
+                                {result.text}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {locOpts.length > 0 && (
+                    <p className="text-[11px] text-zinc-500">
+                      Locations: {locOpts.map(o => `${o.label}${o.tier ? ` (${o.tier === 'paid' ? 'Paid' : 'Free'})` : ''}`).join(', ')}
                     </p>
                   )}
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleOpenEggModal(prod)}
-                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5"
-                    >
-                      <Server className="h-3.5 w-3.5" /> Edit Mapping
-                    </button>
-                    <button
-                      onClick={() => handleTestEgg(prod)}
-                      disabled={!isMapped || testingEggProductId === prod.id}
-                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
-                    >
-                      {testingEggProductId === prod.id ? 'Testing...' : 'Test Egg'}
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleOpenEggModal(prod)}
+                    className="w-full px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5"
+                  >
+                    <Server className="h-3.5 w-3.5" /> Edit Mapping
+                  </button>
                 </div>
               );
             })}
@@ -583,10 +633,10 @@ export const AdminProducts: React.FC = () => {
         </div>
       )}
 
-      {/* Panel Egg Mapping Modal */}
+      {/* Panel Deployment Mapping Modal */}
       {showEggModal && eggModalProduct && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <form onSubmit={handleSaveEggMapping} className="w-full max-w-lg bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSaveEggMapping} className="w-full max-w-2xl bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
               <h3 className="text-base font-bold text-white">Panel Deployment Mapping — {eggModalProduct.name}</h3>
               <button type="button" onClick={() => setShowEggModal(false)} className="text-zinc-500 hover:text-zinc-300">
@@ -594,64 +644,124 @@ export const AdminProducts: React.FC = () => {
               </button>
             </div>
 
-            <p className="text-[11px] text-zinc-500">
-              The Nest ID and Egg ID come from your panel's admin area. Location IDs override the panel-wide default for this category only.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-zinc-300 mb-1">Nest ID</label>
-                <input
-                  type="number"
-                  value={panelNestId}
-                  onChange={(e) => setPanelNestId(e.target.value)}
-                  placeholder="e.g. 1"
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
-                />
+            {/* Egg (application) options */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-bold text-white">Application (Egg) Options</p>
+                  <p className="text-[11px] text-zinc-500">What customers can choose to deploy — e.g. Node.js, Python. Nest/Egg IDs come from your panel's admin area.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addEggOption}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center gap-1"
+                >
+                  <Plus className="h-3 w-3" /> Add
+                </button>
               </div>
-              <div>
-                <label className="block text-xs text-zinc-300 mb-1">Egg ID</label>
-                <input
-                  type="number"
-                  value={panelEggId}
-                  onChange={(e) => setPanelEggId(e.target.value)}
-                  placeholder="e.g. 3"
-                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
-                />
+
+              {eggOptionsDraft.length === 0 && (
+                <p className="text-[11px] text-zinc-600 italic">No application options yet — orders will fall back to manual setup.</p>
+              )}
+
+              {eggOptionsDraft.map((opt) => (
+                <div key={opt.id} className="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={opt.label}
+                      onChange={(e) => updateEggOption(opt.id, { label: e.target.value })}
+                      placeholder="e.g. Node.js"
+                      className="flex-1 rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white"
+                    />
+                    <button type="button" onClick={() => removeEggOption(opt.id)} className="shrink-0 text-zinc-500 hover:text-rose-400">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      value={opt.nestId || ''}
+                      onChange={(e) => updateEggOption(opt.id, { nestId: Number(e.target.value) })}
+                      placeholder="Nest ID"
+                      className="rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white font-mono"
+                    />
+                    <input
+                      type="number"
+                      value={opt.eggId || ''}
+                      onChange={(e) => updateEggOption(opt.id, { eggId: Number(e.target.value) })}
+                      placeholder="Egg ID"
+                      className="rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white font-mono"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={opt.dockerImage || ''}
+                    onChange={(e) => updateEggOption(opt.id, { dockerImage: e.target.value })}
+                    placeholder="Docker image (optional — uses egg default)"
+                    className="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white font-mono"
+                  />
+                  <input
+                    type="text"
+                    value={opt.startupCommand || ''}
+                    onChange={(e) => updateEggOption(opt.id, { startupCommand: e.target.value })}
+                    placeholder="Startup command (optional — uses egg default)"
+                    className="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white font-mono"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Location/node options */}
+            <div className="space-y-3 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-bold text-white">Location / Node Options</p>
+                  <p className="text-[11px] text-zinc-500">Where customers can choose to deploy, tagged Free or Paid. Leave empty to use the panel-wide default location.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addLocationOption}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center gap-1"
+                >
+                  <Plus className="h-3 w-3" /> Add
+                </button>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs text-zinc-300 mb-1">Docker Image (optional)</label>
-              <input
-                type="text"
-                value={panelDockerImage}
-                onChange={(e) => setPanelDockerImage(e.target.value)}
-                placeholder="Leave blank to use the egg's default image"
-                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
-              />
-            </div>
+              {locationOptionsDraft.length === 0 && (
+                <p className="text-[11px] text-zinc-600 italic">No location options — will use the panel-wide default location.</p>
+              )}
 
-            <div>
-              <label className="block text-xs text-zinc-300 mb-1">Startup Command (optional)</label>
-              <input
-                type="text"
-                value={panelStartupCommand}
-                onChange={(e) => setPanelStartupCommand(e.target.value)}
-                placeholder="Leave blank to use the egg's default startup command"
-                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-zinc-300 mb-1">Deploy Location IDs (optional)</label>
-              <input
-                type="text"
-                value={panelLocationIdsInput}
-                onChange={(e) => setPanelLocationIdsInput(e.target.value)}
-                placeholder="1, 2 — leave blank to use the panel-wide default"
-                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
-              />
+              {locationOptionsDraft.map((opt) => (
+                <div key={opt.id} className="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={opt.label}
+                    onChange={(e) => updateLocationOption(opt.id, { label: e.target.value })}
+                    placeholder="e.g. Germany"
+                    className="flex-1 min-w-[100px] rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white"
+                  />
+                  <input
+                    type="number"
+                    value={opt.locationId || ''}
+                    onChange={(e) => updateLocationOption(opt.id, { locationId: Number(e.target.value) })}
+                    placeholder="Location ID"
+                    className="w-28 rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white font-mono"
+                  />
+                  <select
+                    value={opt.tier || ''}
+                    onChange={(e) => updateLocationOption(opt.id, { tier: e.target.value === 'paid' ? 'paid' : e.target.value === 'free' ? 'free' : undefined })}
+                    className="rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white"
+                  >
+                    <option value="">No tag</option>
+                    <option value="free">Free</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                  <button type="button" onClick={() => removeLocationOption(opt.id)} className="shrink-0 text-zinc-500 hover:text-rose-400">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
