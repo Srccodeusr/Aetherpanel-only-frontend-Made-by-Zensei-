@@ -1,15 +1,30 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db';
+import { Product } from '../../src/types';
 
 const router = Router();
+
+// Strips admin-only panel internals (nest/egg IDs, docker image, startup
+// command, environment, numeric location IDs) before a product ever reaches
+// the public API — customers only ever see a friendly id + label to pick
+// from at checkout (see Checkout.tsx's Deployment section).
+function toPublicProduct(product: Product) {
+  const { panelEggOptions, panelLocationOptions, ...rest } = product;
+  return {
+    ...rest,
+    eggOptions: (panelEggOptions || []).map(o => ({ id: o.id, label: o.label })),
+    locationOptions: (panelLocationOptions || []).map(o => ({ id: o.id, label: o.label, tier: o.tier }))
+  };
+}
 
 // GET /api/v1/public/products
 router.get('/products', async (req: Request, res: Response) => {
   const db = await getDb();
-  res.json({
-    success: true,
-    data: db.products.filter(p => p.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
-  });
+  const data = db.products
+    .filter(p => p.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map(toPublicProduct);
+  res.json({ success: true, data });
 });
 
 // GET /api/v1/public/plans

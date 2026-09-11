@@ -296,7 +296,7 @@ router.post('/products', async (req: AuthenticatedRequest, res: Response) => {
   res.json({ success: true, data: newProd });
 });
 
-// PUT /api/v1/admin/products/:id - Update a product, including its panel/egg deployment mapping
+// PUT /api/v1/admin/products/:id - Update a product, including its panel deployment options
 router.put('/products/:id', async (req: AuthenticatedRequest, res: Response) => {
   const db = await getDb();
   const product = db.products.find(p => p.id === req.params.id);
@@ -304,7 +304,7 @@ router.put('/products/:id', async (req: AuthenticatedRequest, res: Response) => 
 
   const {
     name, slug, description, category, icon, isActive, sortOrder,
-    panelNestId, panelEggId, panelDockerImage, panelStartupCommand, panelEnvironment, panelLocationIds
+    panelEggOptions, panelLocationOptions
   } = req.body || {};
 
   if (name !== undefined) product.name = name;
@@ -315,24 +315,51 @@ router.put('/products/:id', async (req: AuthenticatedRequest, res: Response) => 
   if (isActive !== undefined) product.isActive = !!isActive;
   if (sortOrder !== undefined) product.sortOrder = Number(sortOrder);
 
-  if (panelNestId !== undefined) product.panelNestId = panelNestId === '' || panelNestId === null ? null : Number(panelNestId);
-  if (panelEggId !== undefined) product.panelEggId = panelEggId === '' || panelEggId === null ? null : Number(panelEggId);
-  if (panelDockerImage !== undefined) product.panelDockerImage = panelDockerImage;
-  if (panelStartupCommand !== undefined) product.panelStartupCommand = panelStartupCommand;
-  if (panelEnvironment !== undefined) product.panelEnvironment = panelEnvironment;
-  if (panelLocationIds !== undefined) {
-    product.panelLocationIds = Array.isArray(panelLocationIds)
-      ? panelLocationIds.map((n: any) => Number(n)).filter((n: number) => !isNaN(n))
+  // Each egg option is a customer-selectable "application" (e.g. Node.js vs
+  // Python). Nest/egg IDs, docker image, startup command and environment are
+  // admin-only — never sent to the public API (see public.ts).
+  if (panelEggOptions !== undefined) {
+    product.panelEggOptions = Array.isArray(panelEggOptions)
+      ? panelEggOptions
+          .map((o: any, i: number) => ({
+            id: (o?.id && String(o.id).trim()) || `egg_${Date.now()}_${i}`,
+            label: (o?.label && String(o.label).trim()) || `Option ${i + 1}`,
+            nestId: Number(o?.nestId),
+            eggId: Number(o?.eggId),
+            dockerImage: o?.dockerImage ? String(o.dockerImage).trim() : undefined,
+            startupCommand: o?.startupCommand ? String(o.startupCommand).trim() : undefined,
+            environment: (o?.environment && typeof o.environment === 'object') ? o.environment : undefined
+          }))
+          .filter((o: any) => !isNaN(o.nestId) && !isNaN(o.eggId))
+      : [];
+  }
+
+  // Each location option is a customer-selectable deploy location/node,
+  // optionally tagged free/paid. locationId is the panel's numeric location
+  // ID and is admin-only — never sent to the public API.
+  if (panelLocationOptions !== undefined) {
+    product.panelLocationOptions = Array.isArray(panelLocationOptions)
+      ? panelLocationOptions
+          .map((o: any, i: number) => ({
+            id: (o?.id && String(o.id).trim()) || `loc_${Date.now()}_${i}`,
+            label: (o?.label && String(o.label).trim()) || `Location ${i + 1}`,
+            locationId: Number(o?.locationId),
+            tier: (o?.tier === 'paid' ? 'paid' : (o?.tier === 'free' ? 'free' : undefined)) as ('free' | 'paid' | undefined)
+          }))
+          .filter((o: any) => !isNaN(o.locationId))
       : [];
   }
 
   saveDbSync();
 
-  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_UPDATE_PRODUCT', product.id, `Updated product '${product.name}' (panel egg mapping: nest ${product.panelNestId ?? 'none'} / egg ${product.panelEggId ?? 'none'})`);
+  await createAuditLog(
+    req.user!.id, req.user!.email, req.user!.role, 'ADMIN_UPDATE_PRODUCT', product.id,
+    `Updated product '${product.name}' (${(product.panelEggOptions || []).length} egg option(s), ${(product.panelLocationOptions || []).length} location option(s))`
+  );
   res.json({ success: true, data: product, message: 'Product updated' });
 });
 
-// POST /api/v1/admin/products/:id/test-egg - Verify the mapped nest/egg exists on the linked panel
+// POST /api/v1/admin/products/:id/test-egg - Verify a mapped egg option exists on the linked panel
 router.post('/products/:id/test-egg', async (req: AuthenticatedRequest, res: Response) => {
   const db = await getDb();
   const product = db.products.find(p => p.id === req.params.id);
@@ -340,16 +367,26 @@ router.post('/products/:id/test-egg', async (req: AuthenticatedRequest, res: Res
 
   const settings = db.settings.panelIntegration;
   if (!settings?.panelUrl || !settings?.apiKey) {
-    return res.status(400).json({ success: false, error: { code: 'PANEL_NOT_CONFIGURED', message: 'Link your panel first under Platform Settings -> Link your panel.' } });
+    return res.status(400).json({ success: false, error: { code: 'PANEL_NOT_CONFIGURED', message: 'Link your panel first under Panel Integration.' } });
   }
-  if (!product.panelNestId || !product.panelEggId) {
-    return res.status(400).json({ success: false, error: { code: 'MAPPING_INCOMPLETE', message: 'Set a Nest ID and Egg ID for this product first.' } });
+
+  const options = product.panelEggOptions || [];
+  const { optionId } = req.body || {};
+  const option = optionId ? options.find(o => o.id === optionId) : (options.length === 1 ? options[0] : undefined);
+  if (!option) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'MAPPING_INCOMPLETE',
+        message: options.length === 0 ? 'Add an egg option for this product first.' : 'Specify which egg option to test.'
+      }
+    });
   }
 
   try {
-    const egg = await getEgg({ panelUrl: settings.panelUrl, apiKey: settings.apiKey }, product.panelNestId, product.panelEggId);
+    const egg = await getEgg({ panelUrl: settings.panelUrl, apiKey: settings.apiKey }, option.nestId, option.eggId);
     if (!egg) {
-      return res.status(404).json({ success: false, error: { code: 'EGG_NOT_FOUND', message: `No egg with ID ${product.panelEggId} was found in nest ${product.panelNestId} on the panel.` } });
+      return res.status(404).json({ success: false, error: { code: 'EGG_NOT_FOUND', message: `No egg with ID ${option.eggId} was found in nest ${option.nestId} on the panel.` } });
     }
     res.json({ success: true, message: `Found egg '${egg.name}' on the panel.`, data: egg });
   } catch (err: any) {

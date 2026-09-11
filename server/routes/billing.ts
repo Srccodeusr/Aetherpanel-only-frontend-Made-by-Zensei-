@@ -160,7 +160,7 @@ router.post('/add-credits', authMiddleware, async (req: AuthenticatedRequest, re
 // POST /api/v1/billing/checkout - Purchase a plan (or claim a free plan) with account credits,
 // then kick off panel account + server auto-provisioning in the background.
 router.post('/checkout', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
-  const { planId, billingCycle, couponCode } = req.body || {};
+  const { planId, billingCycle, couponCode, serverName, serverDescription, selectedEggOptionId, selectedLocationOptionId } = req.body || {};
 
   if (!planId) {
     return res.status(400).json({ success: false, error: { code: 'PLAN_REQUIRED', message: 'A plan is required to check out.' } });
@@ -176,6 +176,37 @@ router.post('/checkout', authMiddleware, async (req: AuthenticatedRequest, res: 
   if (!product) {
     return res.status(404).json({ success: false, error: { code: 'PRODUCT_NOT_FOUND', message: 'That plan has no associated product.' } });
   }
+
+  // --- Resolve/validate the customer's deployment choices against what this
+  // product actually offers. Auto-resolved when there's only one option;
+  // required from the client when there's more than one; skipped entirely
+  // when the product has none configured (falls back to manual setup later).
+  const eggOptions = product.panelEggOptions || [];
+  let resolvedEggOptionId: string | undefined;
+  if (eggOptions.length > 1) {
+    const match = eggOptions.find(o => o.id === selectedEggOptionId);
+    if (!match) {
+      return res.status(400).json({ success: false, error: { code: 'EGG_OPTION_REQUIRED', message: 'Choose which application to deploy.' } });
+    }
+    resolvedEggOptionId = match.id;
+  } else if (eggOptions.length === 1) {
+    resolvedEggOptionId = eggOptions[0].id;
+  }
+
+  const locationOptions = product.panelLocationOptions || [];
+  let resolvedLocationOptionId: string | undefined;
+  if (locationOptions.length > 1) {
+    const match = locationOptions.find(o => o.id === selectedLocationOptionId);
+    if (!match) {
+      return res.status(400).json({ success: false, error: { code: 'LOCATION_OPTION_REQUIRED', message: 'Choose a deploy location.' } });
+    }
+    resolvedLocationOptionId = match.id;
+  } else if (locationOptions.length === 1) {
+    resolvedLocationOptionId = locationOptions[0].id;
+  }
+
+  const trimmedServerName = typeof serverName === 'string' ? serverName.trim().slice(0, 60) : '';
+  const trimmedServerDescription = typeof serverDescription === 'string' ? serverDescription.trim().slice(0, 250) : '';
 
   const user = db.users.find(u => u.id === req.user!.id);
   if (!user) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
@@ -238,6 +269,10 @@ router.post('/checkout', authMiddleware, async (req: AuthenticatedRequest, res: 
     paymentMethod: price > 0 ? 'Account Credits' : 'Free Plan',
     adminNote: appliedCoupon ? `Coupon '${appliedCoupon.code}' applied (${appliedCoupon.discountType === 'percent' ? appliedCoupon.discountValue + '%' : '$' + appliedCoupon.discountValue} off)` : undefined,
     provisionId: undefined,
+    serverName: trimmedServerName || undefined,
+    serverDescription: trimmedServerDescription || undefined,
+    selectedEggOptionId: resolvedEggOptionId,
+    selectedLocationOptionId: resolvedLocationOptionId,
     createdAt: new Date().toISOString()
   };
   db.orders.unshift(order);
