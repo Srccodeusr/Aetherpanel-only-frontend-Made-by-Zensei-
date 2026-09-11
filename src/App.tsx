@@ -54,6 +54,7 @@ import { AdminAds } from './pages/admin/AdminAds';
 import { AdminAppearance } from './pages/admin/AdminAppearance';
 import { AdminDiscord } from './pages/admin/AdminDiscord';
 import { AdminLegal } from './pages/admin/AdminLegal';
+import { PanelLinkSettings } from './pages/admin/PanelLinkSettings';
 
 
 function AppContent() {
@@ -325,6 +326,7 @@ function AppContent() {
                 {currentPage === 'admin-ads' && <AdminAds />}
                 {currentPage === 'admin-discord' && <AdminDiscord />}
                 {currentPage === 'admin-appearance' && <AdminAppearance />}
+                {currentPage === 'admin-panel-link' && <PanelLinkSettings />}
               </div>
             </PageTransition>
           </div>
