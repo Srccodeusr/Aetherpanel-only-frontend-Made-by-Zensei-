@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Edit, Trash2, Check, X, RefreshCw, Layers, ShieldCheck, Server } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Check, X, RefreshCw, Layers, ShieldCheck, Server, Link2 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { Plan, Product } from '../../types';
 
@@ -24,6 +24,18 @@ export const AdminProducts: React.FC = () => {
   const [databaseLimit, setDatabaseLimit] = useState(2);
   const [serverLimit, setServerLimit] = useState(1);
   const [isPopular, setIsPopular] = useState(false);
+
+  // Panel Egg Mapping Modal (per product category)
+  const [showEggModal, setShowEggModal] = useState(false);
+  const [eggModalProduct, setEggModalProduct] = useState<Product | null>(null);
+  const [panelNestId, setPanelNestId] = useState('');
+  const [panelEggId, setPanelEggId] = useState('');
+  const [panelDockerImage, setPanelDockerImage] = useState('');
+  const [panelStartupCommand, setPanelStartupCommand] = useState('');
+  const [panelLocationIdsInput, setPanelLocationIdsInput] = useState('');
+  const [savingEggMapping, setSavingEggMapping] = useState(false);
+  const [testingEggProductId, setTestingEggProductId] = useState<string | null>(null);
+  const [eggTestResult, setEggTestResult] = useState<{ productId: string; type: 'success' | 'error'; text: string } | null>(null);
 
   // Feedback notification
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -149,6 +161,60 @@ export const AdminProducts: React.FC = () => {
     selectedProductFilter === 'all' || p.productId === selectedProductFilter
   );
 
+  const handleOpenEggModal = (prod: Product) => {
+    setEggModalProduct(prod);
+    setPanelNestId(prod.panelNestId != null ? String(prod.panelNestId) : '');
+    setPanelEggId(prod.panelEggId != null ? String(prod.panelEggId) : '');
+    setPanelDockerImage(prod.panelDockerImage || '');
+    setPanelStartupCommand(prod.panelStartupCommand || '');
+    setPanelLocationIdsInput((prod.panelLocationIds || []).join(', '));
+    setEggTestResult(null);
+    setShowEggModal(true);
+  };
+
+  const handleSaveEggMapping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eggModalProduct) return;
+    setSavingEggMapping(true);
+
+    const panelLocationIds = panelLocationIdsInput
+      .split(',')
+      .map(s => parseInt(s.trim(), 10))
+      .filter(n => !isNaN(n));
+
+    const res = await apiRequest(`/admin/products/${eggModalProduct.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        panelNestId: panelNestId.trim() === '' ? null : Number(panelNestId),
+        panelEggId: panelEggId.trim() === '' ? null : Number(panelEggId),
+        panelDockerImage: panelDockerImage.trim(),
+        panelStartupCommand: panelStartupCommand.trim(),
+        panelLocationIds
+      })
+    });
+
+    if (res.success) {
+      showToast('success', res.message || 'Panel deployment mapping saved');
+      setShowEggModal(false);
+      fetchPlans();
+    } else {
+      showToast('error', res.error?.message || 'Failed to save panel mapping');
+    }
+    setSavingEggMapping(false);
+  };
+
+  const handleTestEgg = async (prod: Product) => {
+    setTestingEggProductId(prod.id);
+    setEggTestResult(null);
+    const res = await apiRequest(`/admin/products/${prod.id}/test-egg`, { method: 'POST' });
+    if (res.success) {
+      setEggTestResult({ productId: prod.id, type: 'success', text: res.message || 'Egg found on the panel.' });
+    } else {
+      setEggTestResult({ productId: prod.id, type: 'error', text: res.error?.message || 'Test failed.' });
+    }
+    setTestingEggProductId(null);
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       
@@ -188,6 +254,65 @@ export const AdminProducts: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Panel Deployment Mapping */}
+      {!loading && products.length > 0 && (
+        <div className="p-5 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-amber-400" />
+            <h3 className="text-sm font-bold text-white">Panel Deployment Mapping</h3>
+          </div>
+          <p className="text-[11px] text-zinc-500 -mt-2">
+            Map each product category to a nest/egg on your linked hosting panel so checkout can auto-create servers. Connect the panel itself under Panel Integration.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {products.map((prod) => {
+              const isMapped = !!(prod.panelNestId && prod.panelEggId);
+              const testResult = eggTestResult?.productId === prod.id ? eggTestResult : null;
+
+              return (
+                <div key={prod.id} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-white">{prod.name}</p>
+                      <p className="text-[11px] text-zinc-500 font-mono mt-0.5">
+                        {isMapped ? `Nest ${prod.panelNestId} / Egg ${prod.panelEggId}` : 'Not mapped — orders fall back to manual setup'}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono border ${isMapped ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                      {isMapped ? 'Mapped' : 'Unmapped'}
+                    </span>
+                  </div>
+
+                  {testResult && (
+                    <p className={`text-[11px] p-2 rounded-lg border flex items-center gap-1.5 ${testResult.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                      {testResult.type === 'success' ? <ShieldCheck className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
+                      {testResult.text}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleOpenEggModal(prod)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5"
+                    >
+                      <Server className="h-3.5 w-3.5" /> Edit Mapping
+                    </button>
+                    <button
+                      onClick={() => handleTestEgg(prod)}
+                      disabled={!isMapped || testingEggProductId === prod.id}
+                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+                    >
+                      {testingEggProductId === prod.id ? 'Testing...' : 'Test Egg'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-2 border-b border-zinc-800 pb-3">
@@ -452,6 +577,97 @@ export const AdminProducts: React.FC = () => {
                 className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-xs text-zinc-950 font-bold rounded-xl"
               >
                 Save Plan
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Panel Egg Mapping Modal */}
+      {showEggModal && eggModalProduct && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <form onSubmit={handleSaveEggMapping} className="w-full max-w-lg bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-base font-bold text-white">Panel Deployment Mapping — {eggModalProduct.name}</h3>
+              <button type="button" onClick={() => setShowEggModal(false)} className="text-zinc-500 hover:text-zinc-300">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-zinc-500">
+              The Nest ID and Egg ID come from your panel's admin area. Location IDs override the panel-wide default for this category only.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-zinc-300 mb-1">Nest ID</label>
+                <input
+                  type="number"
+                  value={panelNestId}
+                  onChange={(e) => setPanelNestId(e.target.value)}
+                  placeholder="e.g. 1"
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-300 mb-1">Egg ID</label>
+                <input
+                  type="number"
+                  value={panelEggId}
+                  onChange={(e) => setPanelEggId(e.target.value)}
+                  placeholder="e.g. 3"
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-300 mb-1">Docker Image (optional)</label>
+              <input
+                type="text"
+                value={panelDockerImage}
+                onChange={(e) => setPanelDockerImage(e.target.value)}
+                placeholder="Leave blank to use the egg's default image"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-300 mb-1">Startup Command (optional)</label>
+              <input
+                type="text"
+                value={panelStartupCommand}
+                onChange={(e) => setPanelStartupCommand(e.target.value)}
+                placeholder="Leave blank to use the egg's default startup command"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-300 mb-1">Deploy Location IDs (optional)</label>
+              <input
+                type="text"
+                value={panelLocationIdsInput}
+                onChange={(e) => setPanelLocationIdsInput(e.target.value)}
+                placeholder="1, 2 — leave blank to use the panel-wide default"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setShowEggModal(false)}
+                className="px-4 py-2 bg-zinc-900 text-xs text-zinc-300 rounded-xl hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingEggMapping}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-xs text-zinc-950 font-bold rounded-xl disabled:opacity-50"
+              >
+                {savingEggMapping ? 'Saving...' : 'Save Mapping'}
               </button>
             </div>
           </form>
