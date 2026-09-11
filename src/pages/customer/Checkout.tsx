@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, ShieldCheck, Loader2, CheckCircle2, AlertTriangle, Tag,
-  Server, Copy, ExternalLink, DollarSign, Clock, Gamepad2, Bot as BotIcon
+  Server, Copy, ExternalLink, DollarSign, Clock, Gamepad2, Bot as BotIcon, Rocket
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { useAuth } from '../../lib/AuthContext';
@@ -11,6 +11,19 @@ import { Plan, Product } from '../../types';
 interface CheckoutProps {
   onNavigate: (page: string, params?: any) => void;
   params?: { planId?: string; billingCycle?: 'monthly' | 'yearly' };
+}
+
+// Shape actually returned by GET /public/products — panel internals
+// (nestId/eggId/dockerImage/locationId/etc) are stripped server-side; the
+// customer only ever sees an id + label (+ tier for locations) to pick from.
+interface PublicDeployOption {
+  id: string;
+  label: string;
+  tier?: 'free' | 'paid';
+}
+interface PublicProduct extends Omit<Product, 'panelEggOptions' | 'panelLocationOptions'> {
+  eggOptions?: PublicDeployOption[];
+  locationOptions?: PublicDeployOption[];
 }
 
 type ProvisionStatus = 'pending' | 'creating_account' | 'creating_server' | 'completed' | 'awaiting_manual_setup' | 'failed';
@@ -43,13 +56,20 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
 
   const planId = params?.planId;
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<PublicProduct | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(params?.billingCycle === 'yearly' ? 'yearly' : 'monthly');
   const [loadingPlan, setLoadingPlan] = useState(true);
 
   const [couponCode, setCouponCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'details' | 'deployment'>('details');
+
+  // Deployment choices (see PublicProduct.eggOptions / locationOptions)
+  const [serverName, setServerName] = useState('');
+  const [serverDescription, setServerDescription] = useState('');
+  const [selectedEggOptionId, setSelectedEggOptionId] = useState('');
+  const [selectedLocationOptionId, setSelectedLocationOptionId] = useState('');
 
   const [provision, setProvision] = useState<ProvisionState | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,8 +85,11 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
       const foundPlan = (plansRes.data || []).find((p: Plan) => p.id === planId) || null;
       setPlan(foundPlan);
       if (foundPlan) {
-        const foundProduct = (productsRes.data || []).find((pr: Product) => pr.id === foundPlan.productId) || null;
+        const foundProduct: PublicProduct | null = (productsRes.data || []).find((pr: PublicProduct) => pr.id === foundPlan.productId) || null;
         setProduct(foundProduct);
+        // Auto-select when there's exactly one choice — nothing for the customer to pick.
+        if (foundProduct?.eggOptions?.length === 1) setSelectedEggOptionId(foundProduct.eggOptions[0].id);
+        if (foundProduct?.locationOptions?.length === 1) setSelectedLocationOptionId(foundProduct.locationOptions[0].id);
       }
       setLoadingPlan(false);
     };
@@ -95,12 +118,34 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
 
   const handleCheckout = async () => {
     if (!plan) return;
+
+    // Client-side guardrail matching the server's validation — jump the
+    // customer to the Deployment tab if they haven't made a required choice.
+    if (product?.eggOptions && product.eggOptions.length > 1 && !selectedEggOptionId) {
+      setActiveTab('deployment');
+      setCheckoutError('Choose which application to deploy.');
+      return;
+    }
+    if (product?.locationOptions && product.locationOptions.length > 1 && !selectedLocationOptionId) {
+      setActiveTab('deployment');
+      setCheckoutError('Choose a deploy location.');
+      return;
+    }
+
     setSubmitting(true);
     setCheckoutError(null);
 
     const res = await apiRequest('/billing/checkout', {
       method: 'POST',
-      body: JSON.stringify({ planId: plan.id, billingCycle, couponCode: couponCode.trim() || undefined })
+      body: JSON.stringify({
+        planId: plan.id,
+        billingCycle,
+        couponCode: couponCode.trim() || undefined,
+        serverName: serverName.trim() || undefined,
+        serverDescription: serverDescription.trim() || undefined,
+        selectedEggOptionId: selectedEggOptionId || undefined,
+        selectedLocationOptionId: selectedLocationOptionId || undefined
+      })
     });
 
     if (!res.success) {
@@ -185,7 +230,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
             <>
               <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
               <div className="space-y-1">
-                <h2 className="text-lg font-bold text-white">You're all set!</h2>
+                <h2 className="text-lg font-bold text-white">{hasCredentials ? "You're all set!" : 'Payment confirmed'}</h2>
                 <p className="text-xs text-zinc-400">{provision.message}</p>
               </div>
 
@@ -318,25 +363,132 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-xs text-zinc-300">
-          <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.ramMB >= 1024 ? `${plan.ramMB / 1024}GB RAM` : `${plan.ramMB}MB RAM`}</div>
-          <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.cpuCores} vCPU Core{plan.cpuCores > 1 ? 's' : ''}</div>
-          <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.diskGB}GB NVMe Storage</div>
-          <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.backupLimit} Backup Slot{plan.backupLimit > 1 ? 's' : ''}</div>
+        {/* Order Details / Deployment tabs */}
+        <div className="flex items-center gap-2 bg-zinc-950 rounded-xl p-1 border border-zinc-800 text-[11px] w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('details')}
+            className={`px-3 py-1.5 rounded-lg font-semibold ${activeTab === 'details' ? 'bg-violet-600 text-white' : 'text-zinc-400'}`}
+          >
+            Order Details
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('deployment')}
+            className={`px-3 py-1.5 rounded-lg font-semibold ${activeTab === 'deployment' ? 'bg-violet-600 text-white' : 'text-zinc-400'}`}
+          >
+            Deployment
+          </button>
         </div>
 
-        <div>
-          <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300 mb-2">
-            <Tag className="h-3.5 w-3.5 text-violet-400" /> Promo Code (optional)
-          </label>
-          <input
-            type="text"
-            value={couponCode}
-            onChange={(e) => setCouponCode(e.target.value)}
-            placeholder="Enter a promo code..."
-            className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-white uppercase font-mono placeholder-zinc-500 focus:outline-none focus:border-violet-500"
-          />
-        </div>
+        {activeTab === 'details' && (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-xs text-zinc-300">
+              <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.ramMB >= 1024 ? `${plan.ramMB / 1024}GB RAM` : `${plan.ramMB}MB RAM`}</div>
+              <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.cpuCores} vCPU Core{plan.cpuCores > 1 ? 's' : ''}</div>
+              <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.diskGB}GB NVMe Storage</div>
+              <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">{plan.backupLimit} Backup Slot{plan.backupLimit > 1 ? 's' : ''}</div>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300 mb-2">
+                <Tag className="h-3.5 w-3.5 text-violet-400" /> Promo Code (optional)
+              </label>
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                placeholder="Enter a promo code..."
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-white uppercase font-mono placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+          </>
+        )}
+
+        {activeTab === 'deployment' && (
+          <div className="space-y-4">
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300 mb-2">
+                <Server className="h-3.5 w-3.5 text-violet-400" /> Server Name (optional)
+              </label>
+              <input
+                type="text"
+                value={serverName}
+                onChange={(e) => setServerName(e.target.value)}
+                placeholder="Leave blank to auto-generate"
+                maxLength={60}
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-2">Server Description (optional)</label>
+              <textarea
+                value={serverDescription}
+                onChange={(e) => setServerDescription(e.target.value)}
+                placeholder="What's this server for?"
+                maxLength={250}
+                rows={2}
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 resize-none"
+              />
+            </div>
+
+            {product?.eggOptions && product.eggOptions.length > 1 && (
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300 mb-2">
+                  <Rocket className="h-3.5 w-3.5 text-violet-400" /> Application
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {product.eggOptions.map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedEggOptionId(opt.id)}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-semibold border text-left ${
+                        selectedEggOptionId === opt.id
+                          ? 'bg-violet-600/20 border-violet-500 text-white'
+                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {product?.locationOptions && product.locationOptions.length > 1 && (
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-2">Location</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {product.locationOptions.map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedLocationOptionId(opt.id)}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-semibold border text-left flex items-center justify-between gap-2 ${
+                        selectedLocationOptionId === opt.id
+                          ? 'bg-violet-600/20 border-violet-500 text-white'
+                          : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {opt.tier && (
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-mono ${opt.tier === 'paid' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                          {opt.tier === 'paid' ? 'Paid' : 'Free'}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(!product?.eggOptions || product.eggOptions.length <= 1) && (!product?.locationOptions || product.locationOptions.length <= 1) && (
+              <p className="text-xs text-zinc-500 italic">No deployment choices needed for this plan — we'll set everything up automatically.</p>
+            )}
+          </div>
+        )}
 
         <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-4 space-y-2">
           <div className="flex justify-between text-xs text-zinc-400">
