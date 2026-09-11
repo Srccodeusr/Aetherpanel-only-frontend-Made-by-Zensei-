@@ -3,7 +3,8 @@
  * ---------------------
  * Runs after a checkout completes (paid or free-plan). Orchestrates:
  *   1. Create (or reuse) the customer's account on the external panel
- *   2. Look up the egg mapped to the purchased product's category
+ *   2. Resolve which egg (application) and location/node the customer chose
+ *      at checkout — see Product.panelEggOptions / panelLocationOptions
  *   3. If that egg exists in the panel -> create the server, mark completed
  *   4. If it doesn't (not configured yet, wrong ID, panel egg deleted) ->
  *      mark 'awaiting_manual_setup' so an admin can finish it by hand
@@ -51,6 +52,10 @@ export async function createProvisionRecord(order: Order, user: User, plan: Plan
     productName: product.name,
     status: 'pending',
     message: 'Order received. Preparing to set up your service...',
+    serverName: order.serverName,
+    serverDescription: order.serverDescription,
+    selectedEggOptionId: order.selectedEggOptionId,
+    selectedLocationOptionId: order.selectedLocationOptionId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -86,7 +91,7 @@ async function doRunProvisioning(provisionId: string): Promise<void> {
     // No panel linked — this is a fully valid configuration (pure billing, no automation).
     await updateProvision(provisionId, {
       status: 'completed',
-      message: 'Your order is complete.'
+      message: 'Payment confirmed. This account isn\'t linked to a hosting panel, so no server was created automatically.'
     });
     return;
   }
@@ -160,7 +165,7 @@ async function doRunProvisioning(provisionId: string): Promise<void> {
     return;
   }
 
-  // --- Step 2: verify the egg mapped to this product's category exists -------
+  // --- Step 2: resolve the egg (application) the customer is deploying -------
   await updateProvision(provisionId, {
     status: 'creating_server',
     message: 'Provisioning your server...',
@@ -169,10 +174,8 @@ async function doRunProvisioning(provisionId: string): Promise<void> {
     panelUrl: settings.panelUrl
   });
 
-  const nestId = product.panelNestId;
-  const eggId = product.panelEggId;
-
-  if (!nestId || !eggId) {
+  const eggOptions = product.panelEggOptions || [];
+  if (eggOptions.length === 0) {
     await updateProvision(provisionId, {
       status: 'awaiting_manual_setup',
       message: 'Your account is ready. Your server is being finished manually by our team and will appear in your panel shortly.'
@@ -180,9 +183,22 @@ async function doRunProvisioning(provisionId: string): Promise<void> {
     return;
   }
 
+  const eggOption = (record.selectedEggOptionId && eggOptions.find(o => o.id === record.selectedEggOptionId))
+    || (eggOptions.length === 1 ? eggOptions[0] : null);
+
+  if (!eggOption) {
+    // Multiple options exist but nothing valid was selected — shouldn't happen
+    // if checkout validated it, but fail safe rather than guess.
+    await updateProvision(provisionId, {
+      status: 'awaiting_manual_setup',
+      message: 'Your account is ready. We need to confirm which application to deploy, so our team will finish this manually.'
+    });
+    return;
+  }
+
   let egg;
   try {
-    egg = await getEgg(config, nestId, eggId);
+    egg = await getEgg(config, eggOption.nestId, eggOption.eggId);
   } catch (err: any) {
     const msg = err instanceof PanelApiError ? err.message : (err?.message || 'Failed to reach the panel.');
     await updateProvision(provisionId, { status: 'failed', message: 'We could not verify your server template with the panel.', errorMessage: msg });
@@ -198,10 +214,27 @@ async function doRunProvisioning(provisionId: string): Promise<void> {
     return;
   }
 
-  // --- Step 3: create the server ---------------------------------------------
-  const locationIds = (product.panelLocationIds && product.panelLocationIds.length > 0)
-    ? product.panelLocationIds
-    : (settings.defaultLocationIds || []);
+  // --- Step 3: resolve the deploy location/node the customer is using --------
+  const locationOptions = product.panelLocationOptions || [];
+  let locationIds: number[];
+
+  if (locationOptions.length === 0) {
+    // No per-product location options configured — fall back to the
+    // panel-wide default location(s) from Panel Integration settings.
+    locationIds = settings.defaultLocationIds || [];
+  } else {
+    const locationOption = (record.selectedLocationOptionId && locationOptions.find(o => o.id === record.selectedLocationOptionId))
+      || (locationOptions.length === 1 ? locationOptions[0] : null);
+
+    if (!locationOption) {
+      await updateProvision(provisionId, {
+        status: 'awaiting_manual_setup',
+        message: 'Your account is ready. We need to confirm which location to deploy to, so our team will finish this manually.'
+      });
+      return;
+    }
+    locationIds = [locationOption.locationId];
+  }
 
   if (locationIds.length === 0) {
     await updateProvision(provisionId, {
@@ -212,13 +245,18 @@ async function doRunProvisioning(provisionId: string): Promise<void> {
   }
 
   try {
-    const environment = { ...egg.environment, ...(product.panelEnvironment || {}) };
+    const environment = { ...egg.environment, ...(eggOption.environment || {}) };
+    const serverName = (record.serverName && record.serverName.trim())
+      ? record.serverName.trim().slice(0, 60)
+      : `${user.username}-${plan.name}`.slice(0, 60);
+
     const server = await createPanelServer(config, {
-      name: `${user.username}-${plan.name}`.slice(0, 60),
+      name: serverName,
+      description: record.serverDescription,
       userId: panelUserId,
-      eggId,
-      dockerImage: product.panelDockerImage || egg.dockerImage,
-      startup: product.panelStartupCommand || egg.startup,
+      eggId: eggOption.eggId,
+      dockerImage: eggOption.dockerImage || egg.dockerImage,
+      startup: eggOption.startupCommand || egg.startup,
       environment,
       memoryMB: plan.ramMB,
       diskMB: plan.diskGB * 1024,

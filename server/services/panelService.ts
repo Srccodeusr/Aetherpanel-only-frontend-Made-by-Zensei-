@@ -178,6 +178,7 @@ export async function getEgg(config: PanelConfig, nestId: number, eggId: number)
 
 export interface CreateServerInput {
   name: string;
+  description?: string;
   userId: number;
   eggId: number;
   dockerImage: string;
@@ -206,6 +207,7 @@ export async function createPanelServer(config: PanelConfig, input: CreateServer
     method: 'POST',
     body: {
       name: input.name,
+      description: input.description || undefined,
       user: input.userId,
       egg: input.eggId,
       docker_image: input.dockerImage,
