@@ -10,6 +10,7 @@ import authRoutes from './server/routes/auth';
 import publicRoutes from './server/routes/public';
 import billingRoutes from './server/routes/billing';
 import supportRoutes from './server/routes/support';
+import mailRoutes from './server/routes/mail';
 import adminRoutes from './server/routes/admin';
 import adsRoutes from './server/routes/ads';
 import discordRoutes from './server/routes/discord';
@@ -110,6 +111,7 @@ async function startServer() {
   app.use('/api/v1/plans', publicRoutes);
   app.use('/api/v1/billing', billingRoutes);
   app.use('/api/v1/support', supportRoutes);
+  app.use('/api/v1/mail', mailRoutes);
   app.use('/api/v1/admin', adminRoutes);
   app.use('/api/v1/ads', adsRoutes);
   app.use('/api/v1/discord', discordRoutes);
