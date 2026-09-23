@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { getInstallationId } from './installation';
 import {
   User, Product, Plan, Order, Coupon,
-  SupportTicket, Announcement, AuditLog, SystemSettings,
+  SupportTicket, Announcement, Mail, AuditLog, SystemSettings,
   AdItem, AdEvent,
   DiscordAccount, DiscordAuditLog,
   ApiKey, ApiAuditLog, WebhookSubscription, LegalPage,
@@ -25,6 +25,7 @@ export interface DatabaseSchema {
   coupons: Coupon[];
   tickets: SupportTicket[];
   announcements: Announcement[];
+  mail: Mail[];
   auditLogs: AuditLog[];
   settings: SystemSettings;
   ads: AdItem[];
@@ -303,6 +304,7 @@ function defaultDb(): DatabaseSchema {
     coupons: [],
     tickets: [],
     announcements: [],
+    mail: [],
     auditLogs: [],
     settings: defaultSettings,
     ads: [],
@@ -377,6 +379,7 @@ export async function getDb(reload = false): Promise<DatabaseSchema> {
         if (!dbCache.products || dbCache.products.length === 0) dbCache.products = defaultProducts;
         if (!dbCache.plans || dbCache.plans.length === 0) dbCache.plans = defaultPlans;
         if (!dbCache.settings) dbCache.settings = defaultSettings;
+        if (!dbCache.mail) dbCache.mail = [];
         if (!dbCache.ads) dbCache.ads = [];
         if (!dbCache.adEvents) dbCache.adEvents = [];
         if (!dbCache.discordLinks) dbCache.discordLinks = {};
