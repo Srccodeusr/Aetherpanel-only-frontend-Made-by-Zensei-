@@ -36,6 +36,7 @@ import { Dashboard } from './pages/customer/Dashboard';
 import { Billing } from './pages/customer/Billing';
 import { Checkout } from './pages/customer/Checkout';
 import { SupportTickets } from './pages/customer/SupportTickets';
+import { Mail } from './pages/customer/Mail';
 import { ActivityLog } from './pages/customer/ActivityLog';
 import { UserSettings } from './pages/customer/UserSettings';
 
@@ -47,6 +48,7 @@ import { AdminBilling } from './pages/admin/AdminBilling';
 import { AdminCoupons } from './pages/admin/AdminCoupons';
 import { AdminAnnouncements } from './pages/admin/AdminAnnouncements';
 import { AdminSupport } from './pages/admin/AdminSupport';
+import { AdminMail } from './pages/admin/AdminMail';
 import { AdminAuditLogs } from './pages/admin/AdminAuditLogs';
 import { AdminApiKeys } from './pages/admin/AdminApiKeys';
 import { AdminSettings } from './pages/admin/AdminSettings';
@@ -308,6 +310,7 @@ function AppContent() {
                 {currentPage === 'billing' && <Billing onNavigate={handleNavigate} />}
                 {currentPage === 'checkout' && <Checkout onNavigate={handleNavigate} params={pageParams} />}
                 {currentPage === 'support' && <SupportTickets onNavigate={handleNavigate} />}
+                {currentPage === 'mail' && <Mail onNavigate={handleNavigate} />}
                 {currentPage === 'activity' && <ActivityLog />}
                 {currentPage === 'settings' && <UserSettings />}
 
@@ -319,6 +322,7 @@ function AppContent() {
                 {currentPage === 'admin-coupons' && <AdminCoupons />}
                 {currentPage === 'admin-announcements' && <AdminAnnouncements />}
                 {currentPage === 'admin-support' && <AdminSupport />}
+                {currentPage === 'admin-mail' && <AdminMail />}
                 {currentPage === 'admin-audit-logs' && <AdminAuditLogs />}
                 {currentPage === 'admin-api-keys' && <AdminApiKeys onNavigate={handleNavigate} />}
                 {currentPage === 'admin-legal' && <AdminLegal />}

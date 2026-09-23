@@ -698,6 +698,24 @@ export interface Announcement {
   createdAt: string;
 }
 
+export interface Mail {
+  id: string;
+  installationId?: string;
+  batchId: string; // groups a single send action together (useful for broadcast sends)
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  recipientId: string;
+  recipientName: string;
+  recipientEmail: string;
+  subject: string;
+  body: string;
+  isRead: boolean;
+  readAt?: string;
+  isBroadcast: boolean;
+  createdAt: string;
+}
+
 export interface AuditLog {
   id: string;
   installationId?: string;
