@@ -5,10 +5,11 @@ import {
   Sparkles, Search, Menu, X, LayoutDashboard, CreditCard, LifeBuoy,
   Settings, LogOut, Sliders, Users, Package,
   Megaphone, ShoppingBag, MessageSquare, Palette, FileText,
-  Tag, Key, Scale, Link2
+  Tag, Key, Scale, Link2, Mail
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
+import { apiRequest } from '../lib/api';
 import { AetherLogo } from './AetherLogo';
 
 interface NavbarProps {
@@ -25,11 +26,35 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, logout } = useAuth();
   const { accentClasses } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadMailCount, setUnreadMailCount] = useState(0);
 
   const handleNav = (page: string, params?: any) => {
     onNavigate(page, params);
     setMobileMenuOpen(false);
   };
+
+  // Poll the mailbox unread count for the navbar mail icon badge
+  useEffect(() => {
+    if (!user) {
+      setUnreadMailCount(0);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchUnreadCount = async () => {
+      const res = await apiRequest('/mail/unread-count');
+      if (!cancelled && res.success && res.data) {
+        setUnreadMailCount(res.data.count || 0);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user, currentPage]);
 
   // Close on ESC key, prevent background body scroll when open & close on desktop resize
   useEffect(() => {
@@ -142,6 +167,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               <kbd className="hidden md:inline-flex px-1.5 py-0.5 text-[10px] font-mono text-zinc-500 bg-zinc-950 rounded border border-zinc-800">
                 ⌘K
               </kbd>
+            </button>
+          )}
+
+          {user && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleNav('mail');
+              }}
+              className="relative h-11 w-11 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-900 border border-zinc-800/80 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              title="Mailbox"
+              aria-label="Open mailbox"
+            >
+              <Mail className="h-4 w-4" />
+              {unreadMailCount > 0 && (
+                <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white bg-gradient-to-r ${accentClasses.gradient} flex items-center justify-center`}>
+                  {unreadMailCount > 9 ? '9+' : unreadMailCount}
+                </span>
+              )}
             </button>
           )}
 
@@ -359,6 +404,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </button>
                         <button
                           type="button"
+                          onClick={() => handleNav('admin-mail')}
+                          className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-mail' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
+                        >
+                          <Mail className="h-4 w-4" /> Mail Center
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleNav('admin-audit-logs')}
                           className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-audit-logs' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
                         >
@@ -418,6 +470,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                           className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'support' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
                         >
                           <LifeBuoy className="h-4 w-4" /> Support Tickets
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleNav('mail')}
+                          className={`w-full flex items-center justify-between px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'mail' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Mail className="h-4 w-4" /> Mail
+                          </div>
+                          {unreadMailCount > 0 && (
+                            <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white bg-gradient-to-r ${accentClasses.gradient} flex items-center justify-center`}>
+                              {unreadMailCount > 9 ? '9+' : unreadMailCount}
+                            </span>
+                          )}
                         </button>
                         <button
                           type="button"

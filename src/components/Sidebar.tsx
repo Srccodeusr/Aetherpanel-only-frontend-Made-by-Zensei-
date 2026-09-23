@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  LayoutDashboard, CreditCard, LifeBuoy,
+  LayoutDashboard, CreditCard, LifeBuoy, Mail,
   Activity, Settings, LogOut, ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
@@ -54,6 +54,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <LifeBuoy className={`h-4 w-4 ${currentPage === 'support' ? accentClasses.text : ''}`} />
             <span>Support Tickets</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('mail')}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${currentPage === 'mail' ? 'bg-zinc-800/80 text-white font-semibold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+          >
+            <Mail className={`h-4 w-4 ${currentPage === 'mail' ? accentClasses.text : ''}`} />
+            <span>Mail</span>
           </button>
 
           <button
