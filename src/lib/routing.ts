@@ -42,6 +42,7 @@ export function parseUrlToRoute(pathname: string, search: string): RouteState {
   if (first === 'billing') return { page: 'billing', params: queryObj };
   if (first === 'checkout') return { page: 'checkout', params: queryObj };
   if (first === 'support') return { page: 'support', params: queryObj };
+  if (first === 'mail') return { page: 'mail', params: queryObj };
   if (first === 'activity') return { page: 'activity', params: queryObj };
   if (first === 'settings') return { page: 'settings', params: queryObj };
 
@@ -60,6 +61,7 @@ export function parseUrlToRoute(pathname: string, search: string): RouteState {
     if (sub === 'panel-link' || sub === 'panel' || sub === 'panel-integration') return { page: 'admin-panel-link', params: queryObj };
     if (sub === 'appearance' || sub === 'fonts-themes' || sub === 'theme') return { page: 'admin-appearance', params: queryObj };
     if (sub === 'support') return { page: 'admin-support', params: queryObj };
+    if (sub === 'mail') return { page: 'admin-mail', params: queryObj };
     if (sub === 'audit-logs' || sub === 'logs') return { page: 'admin-audit-logs', params: queryObj };
     if (sub === 'api-keys' || sub === 'keys') return { page: 'admin-api-keys', params: queryObj };
     if (sub === 'legal' || sub === 'content' || sub === 'legal-pages') return { page: 'admin-legal', params: queryObj };
@@ -102,6 +104,7 @@ export function routeToUrl(page: string, params?: Record<string, any>): string {
     case 'billing': return `/billing${formatQuery(params)}`;
     case 'checkout': return `/checkout${formatQuery(params)}`;
     case 'support': return `/support${formatQuery(params)}`;
+    case 'mail': return `/mail${formatQuery(params)}`;
     case 'activity': return `/activity${formatQuery(params)}`;
     case 'settings': return `/settings${formatQuery(params)}`;
 
@@ -117,6 +120,7 @@ export function routeToUrl(page: string, params?: Record<string, any>): string {
     case 'admin-appearance': return `/admin/appearance${formatQuery(params)}`;
     case 'admin-legal': return `/admin/legal${formatQuery(params)}`;
     case 'admin-support': return `/admin/support${formatQuery(params)}`;
+    case 'admin-mail': return `/admin/mail${formatQuery(params)}`;
     case 'admin-audit-logs': return `/admin/audit-logs${formatQuery(params)}`;
     case 'admin-api-keys': return `/admin/api-keys${formatQuery(params)}`;
     case 'admin-settings': return `/admin/settings${formatQuery(params)}`;
