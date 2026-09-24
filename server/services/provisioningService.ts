@@ -88,10 +88,13 @@ async function doRunProvisioning(provisionId: string): Promise<void> {
 
   const settings = db.settings.panelIntegration;
   if (!settings || !settings.enabled || !settings.panelUrl || !settings.apiKey) {
-    // No panel linked — this is a fully valid configuration (pure billing, no automation).
+    // No panel linked — nothing can be created automatically, so a staff member
+    // sets the service up by hand and mails the customer their credentials.
+    // (Marking this 'completed' made the checkout screen claim everything was
+    // done when nobody had actually delivered anything.)
     await updateProvision(provisionId, {
-      status: 'completed',
-      message: 'Payment confirmed. This account isn\'t linked to a hosting panel, so no server was created automatically.'
+      status: 'awaiting_manual_setup',
+      message: 'Payment received. A staff member will set up your service and mail you your credentials.'
     });
     return;
   }
