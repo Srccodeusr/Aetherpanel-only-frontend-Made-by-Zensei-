@@ -1,43 +1,107 @@
 import React, { useState, useEffect } from 'react';
-import { Gamepad2, Bot, Check, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  Gamepad2, Bot, Server, Cloud, Cpu, HardDrive, Globe, Database, Zap, Rocket, Box,
+  Monitor, Terminal, Layers, Check, ArrowRight, type LucideIcon
+} from 'lucide-react';
 import { useTheme } from '../../lib/ThemeContext';
 import { apiRequest } from '../../lib/api';
-import { Plan } from '../../types';
+import { Plan, Product } from '../../types';
 
 interface PricingProps {
   onNavigate: (page: string, params?: any) => void;
 }
 
+// GET /public/products strips panel internals, so only the display fields matter here.
+type PublicProduct = Pick<Product, 'id' | 'name' | 'description' | 'category' | 'icon' | 'isActive' | 'sortOrder'>;
+
+export interface PricingCategory {
+  product: PublicProduct;
+  plans: Plan[];
+}
+
+/**
+ * Turns the live category (product) list + plan list into the tabs shown on the
+ * pricing page. A category only gets a tab when it is active AND has at least
+ * one active plan, so:
+ *   - a deleted category can never linger as an empty tab, and
+ *   - plans that point at a missing / hidden category are simply not shown.
+ */
+export function buildCategories(products: PublicProduct[], plans: Plan[]): PricingCategory[] {
+  return [...products]
+    .filter(p => p.isActive !== false)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    .map(product => ({
+      product,
+      plans: plans.filter(pl => pl.productId === product.id && pl.isActive !== false)
+    }))
+    .filter(c => c.plans.length > 0);
+}
+
+// Category icons are stored by name (admin types e.g. "Server" or "Bot").
+const ICONS: Record<string, LucideIcon> = {
+  gamepad2: Gamepad2, bot: Bot, server: Server, cloud: Cloud, cpu: Cpu, harddrive: HardDrive,
+  globe: Globe, database: Database, zap: Zap, rocket: Rocket, box: Box, monitor: Monitor,
+  terminal: Terminal, layers: Layers
+};
+
+export function resolveIcon(name?: string): LucideIcon {
+  return ICONS[String(name || '').trim().toLowerCase()] || Server;
+}
+
+// Full class names (not built dynamically) so Tailwind can see and generate them.
+const ACCENTS = [
+  'bg-violet-600 text-white shadow-lg shadow-violet-500/20',
+  'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20',
+  'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20',
+  'bg-amber-600 text-white shadow-lg shadow-amber-500/20',
+  'bg-rose-600 text-white shadow-lg shadow-rose-500/20',
+  'bg-sky-600 text-white shadow-lg shadow-sky-500/20'
+];
+
+// Keep the original look for the two built-in categories; rotate for new ones.
+function accentFor(product: PublicProduct, index: number): string {
+  if (product.category === 'minecraft') return ACCENTS[0];
+  if (product.category === 'bot') return ACCENTS[1];
+  return ACCENTS[2 + (index % (ACCENTS.length - 2))];
+}
+
 export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
   const { accentClasses } = useTheme();
-  const [activeCategory, setActiveCategory] = useState<'minecraft' | 'bot'>('minecraft');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [categories, setCategories] = useState<PricingCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadPricing = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [productsRes, plansRes] = await Promise.all([
+        apiRequest('/public/products'),
+        apiRequest('/public/plans')
+      ]);
+      if (productsRes.success && plansRes.success && Array.isArray(productsRes.data) && Array.isArray(plansRes.data)) {
+        setCategories(buildCategories(productsRes.data, plansRes.data));
+      } else {
+        setLoadError(productsRes.error?.message || plansRes.error?.message || 'Could not load plans.');
+      }
+    } catch (err: any) {
+      console.error('Failed to load pricing:', err);
+      setLoadError(err?.message || 'Could not load plans.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadPlans = async () => {
-      try {
-        const res = await apiRequest('/public/plans');
-        if (res.success && Array.isArray(res.data)) {
-          setPlans(res.data);
-        }
-      } catch (err) {
-        console.error('Failed to load plans:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPlans();
+    loadPricing();
   }, []);
 
-  const activePlans = plans.filter(p => {
-    if (activeCategory === 'minecraft') {
-      return p.productId === 'prod_minecraft' || p.id.startsWith('plan_mc_');
-    }
-    return p.productId === 'prod_bot' || p.id.startsWith('plan_bot_');
-  });
+  // Derived, not stored: if the selected category disappears (deleted / emptied
+  // while the page is open) we fall back to the first one instead of showing nothing.
+  const active = categories.find(c => c.product.id === selectedId) || categories[0];
+  const activePlans = active ? active.plans : [];
 
   return (
     <div className="space-y-12 py-8 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -48,41 +112,47 @@ export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
           No hidden fees or bandwidth limits. Select your product and get started with straightforward checkout.
         </p>
 
-        {/* Category Switcher */}
-        <div className="pt-4 flex items-center justify-center gap-2">
-          <button
-            onClick={() => setActiveCategory('minecraft')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              activeCategory === 'minecraft' ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20' : 'bg-zinc-900 text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Gamepad2 className="h-4 w-4" />
-            <span>Minecraft Hosting</span>
-          </button>
-          <button
-            onClick={() => setActiveCategory('bot')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              activeCategory === 'bot' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'bg-zinc-900 text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Bot className="h-4 w-4" />
-            <span>Discord Bot Hosting</span>
-          </button>
-        </div>
+        {/* Category Switcher — one tab per live category */}
+        {categories.length > 0 && (
+          <div className="pt-4 flex flex-wrap items-center justify-center gap-2">
+            {categories.map((c, i) => {
+              const Icon = resolveIcon(c.product.icon);
+              const isActive = active?.product.id === c.product.id;
+              return (
+                <button
+                  key={c.product.id}
+                  onClick={() => setSelectedId(c.product.id)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                    isActive ? accentFor(c.product, i) : 'bg-zinc-900 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{c.product.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {active?.product.description && (
+          <p className="text-xs text-zinc-500 max-w-xl mx-auto">{active.product.description}</p>
+        )}
 
         {/* Billing Cycle Switcher */}
-        <div className="pt-2 flex items-center justify-center gap-3">
-          <span className={`text-xs ${billingCycle === 'monthly' ? 'text-white font-bold' : 'text-zinc-500'}`}>Monthly</span>
-          <button
-            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-            className="w-11 h-6 rounded-full bg-zinc-800 p-1 flex items-center relative"
-          >
-            <div className={`h-4 w-4 rounded-full bg-violet-500 transition-transform ${billingCycle === 'yearly' ? 'translate-x-5' : ''}`} />
-          </button>
-          <span className={`text-xs ${billingCycle === 'yearly' ? 'text-white font-bold' : 'text-zinc-500'}`}>
-            Yearly (17% OFF)
-          </span>
-        </div>
+        {categories.length > 0 && (
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <span className={`text-xs ${billingCycle === 'monthly' ? 'text-white font-bold' : 'text-zinc-500'}`}>Monthly</span>
+            <button
+              onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+              className="w-11 h-6 rounded-full bg-zinc-800 p-1 flex items-center relative"
+            >
+              <div className={`h-4 w-4 rounded-full bg-violet-500 transition-transform ${billingCycle === 'yearly' ? 'translate-x-5' : ''}`} />
+            </button>
+            <span className={`text-xs ${billingCycle === 'yearly' ? 'text-white font-bold' : 'text-zinc-500'}`}>
+              Yearly (17% OFF)
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Plans Grid */}
@@ -90,9 +160,19 @@ export const Pricing: React.FC<PricingProps> = ({ onNavigate }) => {
         <div className="flex justify-center items-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
         </div>
+      ) : loadError ? (
+        <div className="text-center py-16 space-y-3">
+          <p className="text-sm text-rose-400">{loadError}</p>
+          <button
+            onClick={loadPricing}
+            className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold"
+          >
+            Try again
+          </button>
+        </div>
       ) : activePlans.length === 0 ? (
         <div className="text-center py-16 text-zinc-500 text-sm">
-          No active plans available for this category.
+          No plans are available right now. Please check back soon.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
