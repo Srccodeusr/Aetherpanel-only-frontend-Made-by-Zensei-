@@ -42,7 +42,13 @@ export const AdminMail: React.FC = () => {
       apiRequest('/admin/users')
     ]);
     if (sentRes.success && sentRes.data) setSentMail(sentRes.data);
-    if (usersRes.success && usersRes.data) setUsers(usersRes.data);
+    if (usersRes.success && usersRes.data) {
+      setUsers(usersRes.data);
+    } else {
+      // Without the user list the recipient dropdown is empty — say why
+      // instead of leaving the admin to hit a confusing "no user" error later.
+      toast.error(usersRes.error?.message || 'Could not load the user list for the recipient dropdown.');
+    }
     setLoading(false);
   };
 

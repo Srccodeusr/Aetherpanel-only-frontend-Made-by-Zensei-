@@ -136,6 +136,15 @@ export const AdminSettings: React.FC = () => {
 
   const [saved, setSaved] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionMsgIsError, setActionMsgIsError] = useState(false);
+
+  // Pending-order review: which order is being processed / rejected. Rejecting
+  // uses an in-app dialog — the browser's prompt() is silently blocked in
+  // sandboxed previews (Codespaces Simple Browser, CodeSandbox, iframes), which
+  // made "Reject" do nothing there.
+  const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Order | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const fetchSettings = async () => {
     const res = await apiRequest('/admin/settings');
@@ -389,31 +398,57 @@ export const AdminSettings: React.FC = () => {
     }
   };
 
+  const flashActionMsg = (text: string, isError = false) => {
+    setActionMsg(text);
+    setActionMsgIsError(isError);
+    setTimeout(() => setActionMsg(null), isError ? 8000 : 6000);
+  };
+
   const handleApproveOrder = async (orderId: string) => {
+    if (processingOrderId) return;
+    setProcessingOrderId(orderId);
     const res = await apiRequest(`/admin/orders/${orderId}/approve`, { method: 'POST' });
     if (res.success) {
-      setActionMsg(res.message || 'Payment approved!');
-      fetchPendingOrders();
+      flashActionMsg(res.message || 'Payment approved!');
     } else {
-      setActionMsg(res.error?.message || 'Failed to approve order.');
+      flashActionMsg(res.error?.message || 'Failed to approve order.', true);
     }
-    setTimeout(() => setActionMsg(null), 5000);
+    await fetchPendingOrders();
+    setProcessingOrderId(null);
   };
 
-  const handleRejectOrder = async (orderId: string) => {
-    const reason = prompt('Reason for rejecting payment:');
-    if (reason === null) return;
+  const openRejectDialog = (order: Order) => {
+    setRejectReason('');
+    setRejectTarget(order);
+  };
 
-    const res = await apiRequest(`/admin/orders/${orderId}/reject`, {
+  const handleConfirmReject = async () => {
+    if (!rejectTarget || processingOrderId) return;
+    const order = rejectTarget;
+    setProcessingOrderId(order.id);
+
+    const res = await apiRequest(`/admin/orders/${order.id}/reject`, {
       method: 'POST',
-      body: JSON.stringify({ reason })
+      body: JSON.stringify({ reason: rejectReason.trim() })
     });
     if (res.success) {
-      setActionMsg(res.message || 'Payment rejected.');
-      fetchPendingOrders();
-      setTimeout(() => setActionMsg(null), 4000);
+      flashActionMsg(res.message || 'Payment rejected.');
+      setRejectTarget(null);
+    } else {
+      flashActionMsg(res.error?.message || 'Failed to reject order.', true);
     }
+    await fetchPendingOrders();
+    setProcessingOrderId(null);
   };
+
+  // Load the current settings and the pending-approval count as soon as the
+  // page opens (previously nothing loaded until a tab was clicked, so the
+  // Pending Approvals badge and the saved payment settings stayed empty).
+  useEffect(() => {
+    fetchSettings();
+    fetchPendingOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
@@ -472,8 +507,12 @@ export const AdminSettings: React.FC = () => {
       )}
 
       {actionMsg && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-400 flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4" /> {actionMsg}
+        <div className={`p-4 rounded-2xl border text-xs font-semibold flex items-center gap-2 ${
+          actionMsgIsError
+            ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+            : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+        }`}>
+          {actionMsgIsError ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />} {actionMsg}
         </div>
       )}
 
@@ -1424,8 +1463,8 @@ export const AdminSettings: React.FC = () => {
         <div className="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <div>
-              <h2 className="text-base font-bold text-white">Manual Payment Proofs Pending Approval</h2>
-              <p className="text-xs text-zinc-400 mt-0.5">Verify user transaction reference numbers or UTRs and credit user balances.</p>
+              <h2 className="text-base font-bold text-white">Orders Pending Approval</h2>
+              <p className="text-xs text-zinc-400 mt-0.5">Verify deposits (UTR / gift card codes) and plan purchases. Approving a purchase sets the service up; rejecting refunds any credits that were held.</p>
             </div>
             <button
               onClick={fetchPendingOrders}
@@ -1465,9 +1504,22 @@ export const AdminSettings: React.FC = () => {
                     <div className="text-xs text-zinc-300">
                       Amount: <strong className="text-emerald-400 font-mono">${order.amount.toFixed(2)}</strong> ({order.planName})
                     </div>
-                    <div className="text-[11px] text-zinc-400 font-mono">
-                      Ref / UTR / Code: <span className="text-white font-bold">{order.transactionRef || 'None provided'}</span>
+                    <div className="text-[11px] text-zinc-400">
+                      Customer: <span className="text-white font-semibold">{order.userEmail}</span>
                     </div>
+                    {order.creditsHeld ? (
+                      <div className="text-[11px] text-emerald-400">Paid with account credits (held — refunded if you reject)</div>
+                    ) : (
+                      <div className="text-[11px] text-zinc-400 font-mono">
+                        Ref / UTR / Code: <span className="text-white font-bold">{order.transactionRef || 'None provided'}</span>
+                      </div>
+                    )}
+                    {order.serverName && (
+                      <div className="text-[11px] text-zinc-400">Server name: <span className="text-white">{order.serverName}</span></div>
+                    )}
+                    {order.adminNote && order.planId !== 'credit_deposit' && (
+                      <div className="text-[10px] text-zinc-500">{order.adminNote}</div>
+                    )}
                     <div className="text-[10px] text-zinc-500">
                       Submitted: {new Date(order.createdAt).toLocaleString()}
                     </div>
@@ -1475,22 +1527,85 @@ export const AdminSettings: React.FC = () => {
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
-                      onClick={() => handleRejectOrder(order.id)}
-                      className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5"
+                      onClick={() => openRejectDialog(order)}
+                      disabled={!!processingOrderId}
+                      className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
                       <XCircle className="h-3.5 w-3.5" /> Reject
                     </button>
                     <button
                       onClick={() => handleApproveOrder(order.id)}
-                      className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                      disabled={!!processingOrderId}
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Approve & Credit
+                      {processingOrderId === order.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <CheckCircle2 className="h-3.5 w-3.5" />}
+                      {order.planId === 'credit_deposit' ? 'Approve & Credit' : 'Approve Order'}
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Reject dialog (in-app — the browser prompt() is blocked in sandboxed previews) */}
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-rose-400" /> Reject order
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRejectTarget(null)}
+                disabled={!!processingOrderId}
+                className="text-zinc-500 hover:text-zinc-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              {rejectTarget.planName} — <span className="font-mono text-white">${rejectTarget.amount.toFixed(2)}</span> from {rejectTarget.userEmail}.
+              {rejectTarget.creditsHeld && ' The held credits will be refunded to the customer automatically.'}
+              {' '}They'll get a message in their Mail inbox with your reason.
+            </p>
+
+            <div>
+              <label className="block text-xs text-zinc-300 mb-1">Reason (optional)</label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+                autoFocus
+                placeholder="e.g. Gift card code was already redeemed"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-xs text-white"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRejectTarget(null)}
+                disabled={!!processingOrderId}
+                className="px-4 py-2 bg-zinc-900 text-xs text-zinc-300 rounded-xl disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReject}
+                disabled={!!processingOrderId}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-xs text-white font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {processingOrderId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />} Reject order
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -49,14 +49,19 @@ export const AdminBilling: React.FC = () => {
             <tbody className="divide-y divide-zinc-800/60">
               {orders.map((o) => (
                 <tr key={o.id} className="hover:bg-zinc-900 transition-colors">
-                  <td className="p-3.5 font-mono text-amber-400 font-semibold">#{o.id.slice(0, 8)}</td>
+                  <td className="p-3.5 font-mono text-amber-400 font-semibold">#{o.id.slice(-8)}</td>
                   <td className="p-3.5 font-semibold text-white">{o.userEmail}</td>
                   <td className="p-3.5 text-zinc-300">{o.planName}</td>
                   <td className="p-3.5 font-mono text-emerald-400 font-bold">${o.amount.toFixed(2)}</td>
                   <td className="p-3.5 text-zinc-400">{o.paymentMethod}</td>
                   <td className="p-3.5">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 capitalize">
-                      {o.status}
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border capitalize ${
+                      o.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                      o.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                      o.status === 'refunded' ? 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' :
+                      'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                    }`}>
+                      {o.status === 'failed' ? 'declined' : o.status}
                     </span>
                   </td>
                   <td className="p-3.5 text-right text-zinc-500 font-mono">{o.createdAt}</td>

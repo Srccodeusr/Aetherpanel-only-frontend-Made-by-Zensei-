@@ -47,6 +47,25 @@ export const AdminProducts: React.FC = () => {
   const [categoryIsActive, setCategoryIsActive] = useState(true);
   const [savingCategory, setSavingCategory] = useState(false);
 
+  // In-app confirmation dialog. The browser's window.confirm() is silently
+  // blocked in sandboxed previews (Codespaces Simple Browser, CodeSandbox,
+  // iframes), which made Delete do nothing / log errors there.
+  const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; confirmLabel: string; onConfirm: () => Promise<void> } | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  const runConfirmedAction = async () => {
+    if (!confirmDialog || confirming) return;
+    setConfirming(true);
+    try {
+      await confirmDialog.onConfirm();
+    } catch (err: any) {
+      showToast('error', err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setConfirming(false);
+      setConfirmDialog(null);
+    }
+  };
+
   // Feedback notification
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -159,16 +178,21 @@ export const AdminProducts: React.FC = () => {
     }
   };
 
-  const handleDeletePlan = async (p: Plan) => {
-    if (!window.confirm(`Are you sure you want to delete plan tier '${p.name}'?`)) return;
-
-    const res = await apiRequest(`/admin/plans/${p.id}`, { method: 'DELETE' });
-    if (res.success) {
-      showToast('success', `Plan '${p.name}' deleted`);
-      fetchPlans();
-    } else {
-      showToast('error', res.error?.message || 'Failed to delete plan');
-    }
+  const handleDeletePlan = (p: Plan) => {
+    setConfirmDialog({
+      title: 'Delete plan',
+      message: `Are you sure you want to delete plan tier '${p.name}'?`,
+      confirmLabel: 'Delete plan',
+      onConfirm: async () => {
+        const res = await apiRequest(`/admin/plans/${p.id}`, { method: 'DELETE' });
+        if (res.success) {
+          showToast('success', `Plan '${p.name}' deleted`);
+          fetchPlans();
+        } else {
+          showToast('error', res.error?.message || 'Failed to delete plan');
+        }
+      }
+    });
   };
 
   const filteredPlans = plans.filter(p =>
@@ -231,20 +255,30 @@ export const AdminProducts: React.FC = () => {
     setSavingCategory(false);
   };
 
-  const handleDeleteCategory = async (prod: Product) => {
+  const handleDeleteCategory = (prod: Product) => {
     const planCount = plans.filter(p => p.productId === prod.id).length;
-    const warning = planCount > 0
+    const message = planCount > 0
       ? `Delete category '${prod.name}'? This will also delete ${planCount} plan${planCount === 1 ? '' : 's'} nested under it. This cannot be undone.`
       : `Delete category '${prod.name}'? This cannot be undone.`;
-    if (!window.confirm(warning)) return;
 
-    const res = await apiRequest(`/admin/products/${prod.id}`, { method: 'DELETE' });
-    if (res.success) {
-      showToast('success', res.message || `Category '${prod.name}' deleted`);
-      fetchPlans();
-    } else {
-      showToast('error', res.error?.message || 'Failed to delete category');
-    }
+    setConfirmDialog({
+      title: 'Delete category',
+      message,
+      confirmLabel: 'Delete category',
+      onConfirm: async () => {
+        const res = await apiRequest(`/admin/products/${prod.id}`, { method: 'DELETE' });
+        if (res.success) {
+          // Don't stay filtered on a category that no longer exists.
+          setSelectedProductFilter(prev => (prev === prod.id ? 'all' : prev));
+          showToast('success', res.message || `Category '${prod.name}' deleted`);
+          fetchPlans();
+        } else {
+          showToast('error', res.error?.message || 'Failed to delete category');
+          // The category may already be gone (stale list) — resync either way.
+          fetchPlans();
+        }
+      }
+    });
   };
 
   const genOptionId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -340,6 +374,36 @@ export const AdminProducts: React.FC = () => {
         }`}>
           <span>{feedback.message}</span>
           <button onClick={() => setFeedback(null)}><X className="h-4 w-4" /></button>
+        </div>
+      )}
+
+      {/* Confirm dialog (in-app replacement for window.confirm) */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-rose-400" /> {confirmDialog.title}
+            </h3>
+            <p className="text-xs text-zinc-400 leading-relaxed">{confirmDialog.message}</p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                disabled={confirming}
+                className="px-4 py-2 bg-zinc-900 text-xs text-zinc-300 rounded-xl disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={runConfirmedAction}
+                disabled={confirming}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-xs text-white font-bold rounded-xl disabled:opacity-60"
+              >
+                {confirming ? 'Deleting...' : confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
