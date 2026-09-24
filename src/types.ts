@@ -599,6 +599,12 @@ export interface Order {
   proofUrl?: string;
   adminNote?: string;
   provisionId?: string;
+  // True while a plan purchase paid with Account Credits is waiting for staff
+  // approval. The credits are deducted up-front (held); approving keeps them
+  // spent, rejecting refunds them.
+  creditsHeld?: boolean;
+  // Promo code applied at checkout — lets a rejected order give the use back.
+  couponCode?: string;
   // Customer's deployment choices at checkout (see Product.panelEggOptions /
   // panelLocationOptions) — undefined when the product has 0 or 1 of a given
   // option, since there was nothing to choose.
