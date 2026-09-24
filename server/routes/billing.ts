@@ -90,14 +90,15 @@ router.get('/payment-methods', authMiddleware, async (req: AuthenticatedRequest,
       upi: { enabled: false, upiId: '', merchantName: '', qrCodeUrl: '', instructions: '' },
       bank: { enabled: false, bankName: '', accountNumber: '', ifsc: '', accountHolder: '', instructions: '' },
       crypto: { enabled: false, walletAddress: '', network: '', instructions: '' },
-      stripe: { enabled: false, instructions: '' }
+      stripe: { enabled: false, instructions: '' },
+      giftCard: { enabled: false, amazonEnabled: false, amazonInstructions: '', playStoreEnabled: false, playStoreInstructions: '' }
     }
   });
 });
 
 // POST /api/v1/billing/add-credits
 router.post('/add-credits', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
-  const { amount, paymentMethod, transactionRef, proofUrl } = req.body;
+  const { amount, paymentMethod, transactionRef, proofUrl, methodType, giftCardType } = req.body;
   const numAmount = parseFloat(amount);
 
   if (isNaN(numAmount) || numAmount < 1) {
@@ -108,15 +109,38 @@ router.post('/add-credits', authMiddleware, async (req: AuthenticatedRequest, re
   const user = db.users.find(u => u.id === req.user!.id);
   if (!user) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
 
-  const isManualMethod = ['upi', 'qr_code', 'bank', 'crypto'].includes(paymentMethod?.toLowerCase());
+  // Normalize which "kind" of method this is so manual methods (which need
+  // staff approval before crediting) are detected reliably — whether the
+  // client sends a machine key (methodType) or only the display label
+  // (paymentMethod, e.g. "UPI / QR Code", "Gift Card - Amazon").
+  const normalizedType = String(methodType || '').toLowerCase();
+  const normalizedLabel = String(paymentMethod || '').toLowerCase();
+  const isGiftCard = normalizedType === 'giftcard' || normalizedLabel.includes('gift card');
+  const isManualMethod = isGiftCard
+    || ['upi', 'qr_code', 'bank', 'crypto'].includes(normalizedType)
+    || normalizedLabel.includes('upi')
+    || normalizedLabel.includes('bank')
+    || normalizedLabel.includes('crypto');
+
+  const resolvedGiftCardType: 'amazon' | 'playstore' | undefined = isGiftCard
+    ? (giftCardType === 'playstore' ? 'playstore' : 'amazon')
+    : undefined;
 
   if (isManualMethod && !transactionRef) {
     return res.status(400).json({
       success: false,
-      error: { code: 'REF_REQUIRED', message: 'Please provide Transaction Reference / UTR Number after completing payment.' }
+      error: {
+        code: 'REF_REQUIRED',
+        message: isGiftCard
+          ? 'Please enter the gift card code before submitting.'
+          : 'Please provide Transaction Reference / UTR Number after completing payment.'
+      }
     });
   }
 
+  // Manual methods (UPI, Bank, Crypto, Gift Card) always land as 'pending' —
+  // a staff member has to verify the reference/code and approve it
+  // (see POST /admin/orders/:id/approve) before credits are added.
   const orderStatus = isManualMethod ? 'pending' : 'paid';
 
   if (orderStatus === 'paid') {
@@ -135,6 +159,7 @@ router.post('/add-credits', authMiddleware, async (req: AuthenticatedRequest, re
     status: orderStatus as 'paid' | 'pending',
     paymentMethod: paymentMethod || 'Instant Card',
     transactionRef: transactionRef || undefined,
+    giftCardType: resolvedGiftCardType,
     proofUrl: proofUrl || undefined,
     createdAt: new Date().toISOString()
   };
@@ -145,7 +170,9 @@ router.post('/add-credits', authMiddleware, async (req: AuthenticatedRequest, re
   if (orderStatus === 'pending') {
     return res.json({
       success: true,
-      message: `Payment submitted for verification! Transaction Ref: ${transactionRef}. Admin will verify and credit $${numAmount.toFixed(2)} shortly.`,
+      message: isGiftCard
+        ? `Gift card code submitted for verification! Our team will verify it and credit $${numAmount.toFixed(2)} to your balance once approved.`
+        : `Payment submitted for verification! Transaction Ref: ${transactionRef}. Admin will verify and credit $${numAmount.toFixed(2)} shortly.`,
       data: { newBalance: user.credits, order }
     });
   }
@@ -157,15 +184,28 @@ router.post('/add-credits', authMiddleware, async (req: AuthenticatedRequest, re
   });
 });
 
-// POST /api/v1/billing/checkout - Purchase a plan (or claim a free plan) with account credits,
-// then kick off panel account + server auto-provisioning in the background.
+// POST /api/v1/billing/checkout - Purchase a plan (or claim a free plan). Pay
+// with account credits (instant — provisioning starts immediately), or a
+// Gift Card code (goes to pending; a staff member verifies the code from
+// Admin > Pending Orders, and approving it is what actually starts
+// provisioning — see POST /admin/orders/:id/approve). No credits are touched
+// on the gift card path.
 router.post('/checkout', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
-  const { planId, billingCycle, couponCode, serverName, serverDescription, selectedEggOptionId, selectedLocationOptionId } = req.body || {};
+  const {
+    planId, billingCycle, couponCode, serverName, serverDescription,
+    selectedEggOptionId, selectedLocationOptionId,
+    paymentMethod, giftCardType, transactionRef
+  } = req.body || {};
 
   if (!planId) {
     return res.status(400).json({ success: false, error: { code: 'PLAN_REQUIRED', message: 'A plan is required to check out.' } });
   }
   const cycle: 'monthly' | 'yearly' = billingCycle === 'yearly' ? 'yearly' : 'monthly';
+  const isGiftCard = String(paymentMethod || '').toLowerCase() === 'giftcard';
+
+  if (isGiftCard && !transactionRef) {
+    return res.status(400).json({ success: false, error: { code: 'REF_REQUIRED', message: 'Please enter the gift card code before submitting.' } });
+  }
 
   const db = await getDb();
   const plan = db.plans.find(p => p.id === planId && p.isActive);
@@ -211,14 +251,27 @@ router.post('/checkout', authMiddleware, async (req: AuthenticatedRequest, res: 
   const user = db.users.find(u => u.id === req.user!.id);
   if (!user) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
 
-  // Enforce the plan's server-slot limit using this user's provisioning history for this plan.
-  const activeStatuses = new Set(['pending', 'creating_account', 'creating_server', 'completed', 'awaiting_manual_setup']);
-  const existingForPlan = db.provisions.filter(p => p.userId === user.id && p.planId === plan.id && activeStatuses.has(p.status)).length;
-  if (plan.serverLimit && existingForPlan >= plan.serverLimit) {
-    return res.status(400).json({
-      success: false,
-      error: { code: 'PLAN_LIMIT_REACHED', message: `You've already reached the server limit (${plan.serverLimit}) for the '${plan.name}' plan.` }
-    });
+  if (isGiftCard) {
+    // Gift card orders don't create a provisioning record until approved, so
+    // they can't be counted by the active-provisions check below — guard
+    // separately against stacking up duplicate pending requests for the same plan.
+    const alreadyPending = db.orders.some(o => o.userId === user.id && o.planId === plan.id && o.status === 'pending');
+    if (alreadyPending) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'DUPLICATE_PENDING', message: `You already have a pending gift card order for '${plan.name}' awaiting verification.` }
+      });
+    }
+  } else {
+    // Enforce the plan's server-slot limit using this user's provisioning history for this plan.
+    const activeStatuses = new Set(['pending', 'creating_account', 'creating_server', 'completed', 'awaiting_manual_setup']);
+    const existingForPlan = db.provisions.filter(p => p.userId === user.id && p.planId === plan.id && activeStatuses.has(p.status)).length;
+    if (plan.serverLimit && existingForPlan >= plan.serverLimit) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'PLAN_LIMIT_REACHED', message: `You've already reached the server limit (${plan.serverLimit}) for the '${plan.name}' plan.` }
+      });
+    }
   }
 
   let price = cycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
@@ -237,6 +290,43 @@ router.post('/checkout', authMiddleware, async (req: AuthenticatedRequest, res: 
       : Math.max(0, parseFloat((price - coupon.discountValue).toFixed(2)));
     coupon.timesUsed = (coupon.timesUsed || 0) + 1;
     appliedCoupon = { code: coupon.code, discountType: coupon.discountType, discountValue: coupon.discountValue };
+  }
+
+  // --- Gift Card path: create a pending order for THIS plan and stop here —
+  // no credits touched, no provisioning yet. Approving it from Admin >
+  // Pending Orders is what actually grants the plan and starts provisioning.
+  if (isGiftCard) {
+    const order: Order = {
+      id: `ord_${Date.now()}`,
+      userId: user.id,
+      userEmail: user.email,
+      planId: plan.id,
+      planName: plan.name,
+      productId: product.id,
+      billingCycle: cycle,
+      amount: price,
+      currency: db.settings.currencyCode || 'USD',
+      status: 'pending',
+      paymentMethod: `Gift Card - ${giftCardType === 'playstore' ? 'Google Play' : 'Amazon'}`,
+      transactionRef,
+      giftCardType: giftCardType === 'playstore' ? 'playstore' : 'amazon',
+      adminNote: appliedCoupon ? `Coupon '${appliedCoupon.code}' applied (${appliedCoupon.discountType === 'percent' ? appliedCoupon.discountValue + '%' : '$' + appliedCoupon.discountValue} off)` : undefined,
+      serverName: trimmedServerName || undefined,
+      serverDescription: trimmedServerDescription || undefined,
+      selectedEggOptionId: resolvedEggOptionId,
+      selectedLocationOptionId: resolvedLocationOptionId,
+      createdAt: new Date().toISOString()
+    };
+    db.orders.unshift(order);
+    saveDbSync();
+
+    await createAuditLog(user.id, user.email, user.role, 'PLAN_ORDER_SUBMITTED', order.id, `Submitted gift card order for plan '${plan.name}' (${cycle}), $${price.toFixed(2)} — awaiting staff verification`);
+
+    return res.json({
+      success: true,
+      message: `Gift card code submitted! A staff member will verify it and set up '${plan.name}' once approved.`,
+      data: { order, pendingApproval: true }
+    });
   }
 
   if (price > 0 && user.credits < price) {

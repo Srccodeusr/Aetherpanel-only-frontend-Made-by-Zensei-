@@ -2,11 +2,11 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { getDb, saveDbSync } from '../db';
 import { authMiddleware, requireRole, AuthenticatedRequest, createAuditLog } from '../auth';
-import { User, Product, Plan, Coupon, Announcement } from '../../src/types';
+import { User, Product, Plan, Coupon, Announcement, Mail } from '../../src/types';
 import { getDiscordOAuthRedirectUri } from '../oauthUrlResolver';
 import { testIpRiskConnection } from '../utils/ipRiskProvider';
 import { getEgg, testPanelConnection, PanelApiError } from '../services/panelService';
-import { runProvisioning } from '../services/provisioningService';
+import { createProvisionRecord, runProvisioning } from '../services/provisioningService';
 
 const router = Router();
 
@@ -277,6 +277,9 @@ router.get('/products', async (req: AuthenticatedRequest, res: Response) => {
 // POST /api/v1/admin/products - Create product
 router.post('/products', async (req: AuthenticatedRequest, res: Response) => {
   const { name, slug, description, category, icon } = req.body;
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Category name is required.' } });
+  }
   const db = await getDb();
 
   const newProd: Product = {
@@ -284,7 +287,7 @@ router.post('/products', async (req: AuthenticatedRequest, res: Response) => {
     name: name.trim(),
     slug: (slug || name).toLowerCase().replace(/[^a-z0-9]/g, '-'),
     description: description || '',
-    category: category || 'minecraft',
+    category: category || 'other',
     icon: icon || 'Gamepad2',
     isActive: true,
     sortOrder: db.products.length + 1
@@ -292,6 +295,8 @@ router.post('/products', async (req: AuthenticatedRequest, res: Response) => {
 
   db.products.push(newProd);
   saveDbSync();
+
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_CREATE_PRODUCT', newProd.id, `Created product category '${newProd.name}'`);
 
   res.json({ success: true, data: newProd });
 });
@@ -357,6 +362,27 @@ router.put('/products/:id', async (req: AuthenticatedRequest, res: Response) => 
     `Updated product '${product.name}' (${(product.panelEggOptions || []).length} egg option(s), ${(product.panelLocationOptions || []).length} location option(s))`
   );
   res.json({ success: true, data: product, message: 'Product updated' });
+});
+
+// DELETE /api/v1/admin/products/:id - Remove a product category. Also removes
+// any plans still nested under it, since an orphaned plan can't be purchased.
+router.delete('/products/:id', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const product = db.products.find(p => p.id === req.params.id);
+  if (!product) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Product not found' } });
+
+  const removedPlans = db.plans.filter(pl => pl.productId === product.id);
+  db.plans = db.plans.filter(pl => pl.productId !== product.id);
+  db.products = db.products.filter(p => p.id !== product.id);
+
+  saveDbSync();
+
+  await createAuditLog(
+    req.user!.id, req.user!.email, req.user!.role, 'ADMIN_DELETE_PRODUCT', product.id,
+    `Deleted product category '${product.name}' (${removedPlans.length} plan(s) removed with it)`
+  );
+
+  res.json({ success: true, message: `Category '${product.name}' deleted (${removedPlans.length} plan${removedPlans.length === 1 ? '' : 's'} removed with it).` });
 });
 
 // POST /api/v1/admin/products/:id/test-egg - Verify a mapped egg option exists on the linked panel
@@ -697,19 +723,109 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
     return res.status(400).json({ success: false, error: { code: 'ALREADY_PAID', message: 'Order is already marked as paid' } });
   }
 
-  order.status = 'paid';
-  order.adminNote = req.body.adminNote || `Approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`;
-
   const targetUser = db.users.find(u => u.id === order.userId);
-  if (targetUser) {
-    targetUser.credits = parseFloat((targetUser.credits + order.amount).toFixed(2));
+  const approverName = req.user!.displayName || req.user!.username || req.user!.email;
+  // credit_deposit orders are Add-Credits top-ups (UPI/Bank/Gift Card) — approving
+  // just credits the balance. Any other order is a plan bought directly with a
+  // gift card code (see POST /billing/checkout) — approving it IS the payment
+  // confirmation, so it grants the plan and starts provisioning.
+  const isCreditDeposit = order.planId === 'credit_deposit';
+
+  if (isCreditDeposit) {
+    order.status = 'paid';
+    order.adminNote = req.body.adminNote || `Approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`;
+
+    if (targetUser) {
+      targetUser.credits = parseFloat((targetUser.credits + order.amount).toFixed(2));
+
+      // Notify the customer through the site's mail system — this is the
+      // "staff verified and approved" confirmation for manual payments
+      // (UPI/Bank/Gift Card). Actual server/VPS credentials, when a panel
+      // isn't auto-linked, are still sent by a staff member as a separate mail.
+      const approveMail: Mail = {
+        id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        batchId: `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        senderId: req.user!.id,
+        senderName: approverName,
+        senderRole: req.user!.role,
+        recipientId: targetUser.id,
+        recipientName: targetUser.displayName || targetUser.username || targetUser.email,
+        recipientEmail: targetUser.email,
+        subject: 'Payment Approved — Credits Added',
+        body: `Good news! Your ${order.paymentMethod || 'manual'} payment of $${order.amount.toFixed(2)} has been verified and approved.\n\n$${order.amount.toFixed(2)} in account credits has been added to your balance and is ready to use on the Billing page.\n\nIf this order also included a server or VPS, our team will follow up here in Mail with your setup details and credentials shortly.`,
+        isRead: false,
+        isBroadcast: false,
+        createdAt: new Date().toISOString()
+      };
+      db.mail.unshift(approveMail);
+    }
+
+    saveDbSync();
+
+    await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_APPROVE_PAYMENT', order.id, `Approved manual payment #${order.id} of $${order.amount} for user ${order.userEmail}`);
+
+    return res.json({ success: true, message: `Payment #${order.id} approved! $${order.amount.toFixed(2)} added to ${targetUser?.email || 'user'}'s balance.`, data: order });
   }
 
+  // --- Gift card plan purchase: verifying the code IS the payment. Approving
+  // grants the plan and starts panel provisioning — same auto-provision or
+  // fall-back-to-manual-setup flow as a credits checkout uses.
+  if (!targetUser) {
+    return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'The customer for this order no longer exists.' } });
+  }
+  const plan = db.plans.find(p => p.id === order.planId);
+  const product = plan ? db.products.find(p => p.id === plan.productId) : undefined;
+  if (!plan || !product) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'PLAN_UNAVAILABLE', message: 'The plan (or its category) on this order no longer exists — reject this order or set the customer up manually instead.' }
+    });
+  }
+
+  const activeStatuses = new Set(['pending', 'creating_account', 'creating_server', 'completed', 'awaiting_manual_setup']);
+  const existingForPlan = db.provisions.filter(p => p.userId === targetUser.id && p.planId === plan.id && activeStatuses.has(p.status)).length;
+  if (plan.serverLimit && existingForPlan >= plan.serverLimit) {
+    return res.status(400).json({
+      success: false,
+      error: { code: 'PLAN_LIMIT_REACHED', message: `Approving this would exceed ${targetUser.email}'s server limit (${plan.serverLimit}) for '${plan.name}'. Reject it, or have them remove an existing server first.` }
+    });
+  }
+
+  order.status = 'paid';
+  order.adminNote = req.body.adminNote || `Gift card verified and approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`;
+  targetUser.plan = plan.id;
+  targetUser.updatedAt = new Date().toISOString();
   saveDbSync();
 
-  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_APPROVE_PAYMENT', order.id, `Approved manual payment #${order.id} of $${order.amount} for user ${order.userEmail}`);
+  const provisionRecord = await createProvisionRecord(order, targetUser, plan, product);
+  order.provisionId = provisionRecord.id;
+  saveDbSync();
 
-  res.json({ success: true, message: `Payment #${order.id} approved! $${order.amount.toFixed(2)} added to ${targetUser?.email || 'user'}'s balance.`, data: order });
+  // Fire-and-forget, same as a credits checkout — the client's Dashboard/Billing
+  // pages reflect progress once it updates the provisioning record.
+  runProvisioning(provisionRecord.id).catch(() => { /* runProvisioning already handles its own errors */ });
+
+  const approveMail: Mail = {
+    id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+    batchId: `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    senderId: req.user!.id,
+    senderName: approverName,
+    senderRole: req.user!.role,
+    recipientId: targetUser.id,
+    recipientName: targetUser.displayName || targetUser.username || targetUser.email,
+    recipientEmail: targetUser.email,
+    subject: 'Payment Approved — Setting Up Your Server',
+    body: `Good news! Your ${order.paymentMethod || 'gift card'} payment for '${plan.name}' has been verified and approved.\n\nWe're setting up your server now — check your Dashboard in a moment. If a manual step is needed on our end, we'll follow up right here in Mail with your login and credentials.`,
+    isRead: false,
+    isBroadcast: false,
+    createdAt: new Date().toISOString()
+  };
+  db.mail.unshift(approveMail);
+  saveDbSync();
+
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_APPROVE_PAYMENT', order.id, `Approved gift card order #${order.id} for plan '${plan.name}' — provisioning started for user ${order.userEmail}`);
+
+  res.json({ success: true, message: `Payment #${order.id} approved! Provisioning '${plan.name}' for ${targetUser.email}.`, data: order });
 });
 
 // POST /api/v1/admin/orders/:id/reject
@@ -723,6 +839,30 @@ router.post('/orders/:id/reject', async (req: AuthenticatedRequest, res: Respons
 
   order.status = 'failed';
   order.adminNote = req.body.reason || 'Payment rejected by administrator.';
+
+  const targetUser = db.users.find(u => u.id === order.userId);
+  if (targetUser) {
+    const reviewerName = req.user!.displayName || req.user!.username || req.user!.email;
+    const isCreditDeposit = order.planId === 'credit_deposit';
+    const rejectMail: Mail = {
+      id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      batchId: `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      senderId: req.user!.id,
+      senderName: reviewerName,
+      senderRole: req.user!.role,
+      recipientId: targetUser.id,
+      recipientName: targetUser.displayName || targetUser.username || targetUser.email,
+      recipientEmail: targetUser.email,
+      subject: 'Payment Verification Failed',
+      body: isCreditDeposit
+        ? `We couldn't verify your ${order.paymentMethod || 'manual'} payment of $${order.amount.toFixed(2)}.\n\nReason: ${order.adminNote}\n\nPlease double-check the details and submit again from the Billing page, or contact support if you believe this is a mistake.`
+        : `We couldn't verify your ${order.paymentMethod || 'gift card'} payment for '${order.planName}' ($${order.amount.toFixed(2)}).\n\nReason: ${order.adminNote}\n\nPlease double-check the code and try checking out again, or contact support if you believe this is a mistake.`,
+      isRead: false,
+      isBroadcast: false,
+      createdAt: new Date().toISOString()
+    };
+    db.mail.unshift(rejectMail);
+  }
 
   saveDbSync();
 
