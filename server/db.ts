@@ -187,6 +187,13 @@ const defaultSettings: SystemSettings = {
     stripe: {
       enabled: false,
       instructions: 'Instant automatic payment via Credit/Debit Card or Wallet.'
+    },
+    giftCard: {
+      enabled: true,
+      amazonEnabled: true,
+      amazonInstructions: 'Buy an Amazon gift card for the deposit amount and enter the redeem code below. Your balance is added once a staff member verifies the code.',
+      playStoreEnabled: true,
+      playStoreInstructions: 'Buy a Google Play gift card for the deposit amount and enter the redeem code below. Your balance is added once a staff member verifies the code.'
     }
   },
   discordSettings: {
@@ -396,6 +403,12 @@ export async function getDb(reload = false): Promise<DatabaseSchema> {
           dbCache.settings.panelIntegration = defaultPanelIntegration;
         } else {
           dbCache.settings.panelIntegration = { ...defaultPanelIntegration, ...dbCache.settings.panelIntegration };
+        }
+        // Backfill the Gift Card gateway for installs saved before it existed
+        if (!dbCache.settings.paymentGateways) {
+          dbCache.settings.paymentGateways = defaultSettings.paymentGateways;
+        } else if (!dbCache.settings.paymentGateways.giftCard) {
+          dbCache.settings.paymentGateways.giftCard = defaultSettings.paymentGateways!.giftCard;
         }
         if (!dbCache.installationId) dbCache.installationId = getInstallationId();
       } else {
