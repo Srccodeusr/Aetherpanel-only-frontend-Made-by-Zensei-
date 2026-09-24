@@ -121,19 +121,31 @@ router.post('/send', requireRole(STAFF_ROLES), async (req: AuthenticatedRequest,
   const sender = req.user!;
   const isBroadcast = recipientId === 'all';
 
+  // "All Users" means every account. It used to skip the sender's own account,
+  // so on a fresh install (where the admin is the only account) a broadcast
+  // found zero recipients and failed. This also matches the "(N)" count shown
+  // in the compose dropdown, which counts every user.
   const targets = isBroadcast
-    ? db.users.filter(u => u.id !== sender.id)
+    ? db.users
     : db.users.filter(u => u.id === recipientId);
 
   if (targets.length === 0) {
-    return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'No matching recipient(s) found.' } });
+    return res.status(404).json({
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: isBroadcast
+          ? 'There are no user accounts to send this to yet.'
+          : 'The selected user no longer exists. Refresh the page and pick the recipient again.'
+      }
+    });
   }
 
   const batchId = `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const now = new Date().toISOString();
 
-  const newMail: Mail[] = targets.map(u => ({
-    id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+  const newMail: Mail[] = targets.map((u, i) => ({
+    id: `mail_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 8)}`,
     batchId,
     senderId: sender.id,
     senderName: displayName(sender),

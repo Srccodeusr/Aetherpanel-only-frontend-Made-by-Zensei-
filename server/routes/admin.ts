@@ -366,23 +366,40 @@ router.put('/products/:id', async (req: AuthenticatedRequest, res: Response) => 
 
 // DELETE /api/v1/admin/products/:id - Remove a product category. Also removes
 // any plans still nested under it, since an orphaned plan can't be purchased.
+// Any failure comes back as a JSON error (never a hung request / crashed
+// process) so the admin UI can show what went wrong.
 router.delete('/products/:id', async (req: AuthenticatedRequest, res: Response) => {
-  const db = await getDb();
-  const product = db.products.find(p => p.id === req.params.id);
-  if (!product) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Product not found' } });
+  try {
+    const db = await getDb();
+    const product = (db.products || []).find(p => p.id === req.params.id);
+    if (!product) return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Category not found — it may already have been deleted. Refresh the page.' } });
 
-  const removedPlans = db.plans.filter(pl => pl.productId === product.id);
-  db.plans = db.plans.filter(pl => pl.productId !== product.id);
-  db.products = db.products.filter(p => p.id !== product.id);
+    const removedPlans = (db.plans || []).filter(pl => pl.productId === product.id);
+    const removedPlanIds = new Set(removedPlans.map(pl => pl.id));
 
-  saveDbSync();
+    // Orders still waiting for approval on these plans can no longer be approved
+    // once the plan is gone (they can still be rejected, which refunds held credits).
+    const orphanedPending = (db.orders || []).filter(o => o.status === 'pending' && removedPlanIds.has(o.planId)).length;
 
-  await createAuditLog(
-    req.user!.id, req.user!.email, req.user!.role, 'ADMIN_DELETE_PRODUCT', product.id,
-    `Deleted product category '${product.name}' (${removedPlans.length} plan(s) removed with it)`
-  );
+    db.plans = (db.plans || []).filter(pl => pl.productId !== product.id);
+    db.products = (db.products || []).filter(p => p.id !== product.id);
 
-  res.json({ success: true, message: `Category '${product.name}' deleted (${removedPlans.length} plan${removedPlans.length === 1 ? '' : 's'} removed with it).` });
+    saveDbSync();
+
+    await createAuditLog(
+      req.user!.id, req.user!.email, req.user!.role, 'ADMIN_DELETE_PRODUCT', product.id,
+      `Deleted product category '${product.name}' (${removedPlans.length} plan(s) removed with it)`
+    );
+
+    const planText = `${removedPlans.length} plan${removedPlans.length === 1 ? '' : 's'} removed with it`;
+    const pendingText = orphanedPending > 0
+      ? ` ${orphanedPending} pending order${orphanedPending === 1 ? '' : 's'} for these plans can now only be rejected (which refunds any held credits).`
+      : '';
+    res.json({ success: true, message: `Category '${product.name}' deleted (${planText}).${pendingText}` });
+  } catch (err: any) {
+    console.error('[Admin] Failed to delete category:', err);
+    res.status(500).json({ success: false, error: { code: 'DELETE_FAILED', message: err?.message || 'Failed to delete category.' } });
+  }
 });
 
 // POST /api/v1/admin/products/:id/test-egg - Verify a mapped egg option exists on the linked panel
@@ -722,6 +739,12 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
   if (order.status === 'paid') {
     return res.status(400).json({ success: false, error: { code: 'ALREADY_PAID', message: 'Order is already marked as paid' } });
   }
+  // Only orders still waiting for review can be approved. Approving a rejected
+  // order would provision (or credit) something whose payment was already
+  // refunded / declined.
+  if (order.status !== 'pending') {
+    return res.status(400).json({ success: false, error: { code: 'NOT_PENDING', message: `Only pending orders can be approved — this one is already ${order.status}.` } });
+  }
 
   const targetUser = db.users.find(u => u.id === order.userId);
   const approverName = req.user!.displayName || req.user!.username || req.user!.email;
@@ -792,7 +815,13 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
   }
 
   order.status = 'paid';
-  order.adminNote = req.body.adminNote || `Gift card verified and approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`;
+  // Credits paid at checkout were held while the order was pending; approving
+  // makes that spend final. (Gift card orders never touched credits.)
+  const paidWithCredits = !!order.creditsHeld;
+  order.creditsHeld = false;
+  order.adminNote = req.body.adminNote || (paidWithCredits
+    ? `Approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`
+    : `Gift card verified and approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`);
   targetUser.plan = plan.id;
   targetUser.updatedAt = new Date().toISOString();
   saveDbSync();
@@ -815,7 +844,7 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
     recipientName: targetUser.displayName || targetUser.username || targetUser.email,
     recipientEmail: targetUser.email,
     subject: 'Payment Approved — Setting Up Your Server',
-    body: `Good news! Your ${order.paymentMethod || 'gift card'} payment for '${plan.name}' has been verified and approved.\n\nWe're setting up your server now — check your Dashboard in a moment. If a manual step is needed on our end, we'll follow up right here in Mail with your login and credentials.`,
+    body: `Good news! Your ${order.paymentMethod || 'manual'} payment for '${plan.name}' has been verified and approved.\n\nWe're setting up your service now. If it isn't created automatically, a staff member will send your login details and credentials right here in Mail shortly.`,
     isRead: false,
     isBroadcast: false,
     createdAt: new Date().toISOString()
@@ -823,9 +852,13 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
   db.mail.unshift(approveMail);
   saveDbSync();
 
-  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_APPROVE_PAYMENT', order.id, `Approved gift card order #${order.id} for plan '${plan.name}' — provisioning started for user ${order.userEmail}`);
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_APPROVE_PAYMENT', order.id, `Approved ${paidWithCredits ? 'credits' : 'gift card'} order #${order.id} for plan '${plan.name}' — provisioning started for user ${order.userEmail}`);
 
-  res.json({ success: true, message: `Payment #${order.id} approved! Provisioning '${plan.name}' for ${targetUser.email}.`, data: order });
+  res.json({
+    success: true,
+    message: `Order #${order.id} approved! Provisioning '${plan.name}' for ${targetUser.email}. If no panel is linked, send them their credentials from Mail Center.`,
+    data: order
+  });
 });
 
 // POST /api/v1/admin/orders/:id/reject
@@ -836,14 +869,37 @@ router.post('/orders/:id/reject', async (req: AuthenticatedRequest, res: Respons
   if (!order) {
     return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } });
   }
+  // Only a pending order can be declined — a paid one has already been
+  // credited / provisioned, and a failed one has already been declined (and
+  // refunded), so declining it again could refund the customer twice.
+  if (order.status !== 'pending') {
+    return res.status(400).json({ success: false, error: { code: 'NOT_PENDING', message: `Only pending orders can be rejected — this one is already ${order.status}.` } });
+  }
 
   order.status = 'failed';
-  order.adminNote = req.body.reason || 'Payment rejected by administrator.';
+  order.adminNote = (req.body?.reason && String(req.body.reason).trim()) || 'Payment rejected by administrator.';
 
   const targetUser = db.users.find(u => u.id === order.userId);
+  const isCreditDeposit = order.planId === 'credit_deposit';
+
+  // Plan purchases paid with Account Credits had the price held at checkout —
+  // give it back, and give the promo code use back too.
+  let refunded = 0;
+  if (order.creditsHeld) {
+    if (targetUser) {
+      targetUser.credits = parseFloat((targetUser.credits + order.amount).toFixed(2));
+      targetUser.updatedAt = new Date().toISOString();
+      refunded = order.amount;
+    }
+    order.creditsHeld = false;
+  }
+  if (order.couponCode) {
+    const coupon = db.coupons.find(c => c.code === order.couponCode);
+    if (coupon && coupon.timesUsed > 0) coupon.timesUsed -= 1;
+  }
+
   if (targetUser) {
     const reviewerName = req.user!.displayName || req.user!.username || req.user!.email;
-    const isCreditDeposit = order.planId === 'credit_deposit';
     const rejectMail: Mail = {
       id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       batchId: `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -856,7 +912,7 @@ router.post('/orders/:id/reject', async (req: AuthenticatedRequest, res: Respons
       subject: 'Payment Verification Failed',
       body: isCreditDeposit
         ? `We couldn't verify your ${order.paymentMethod || 'manual'} payment of $${order.amount.toFixed(2)}.\n\nReason: ${order.adminNote}\n\nPlease double-check the details and submit again from the Billing page, or contact support if you believe this is a mistake.`
-        : `We couldn't verify your ${order.paymentMethod || 'gift card'} payment for '${order.planName}' ($${order.amount.toFixed(2)}).\n\nReason: ${order.adminNote}\n\nPlease double-check the code and try checking out again, or contact support if you believe this is a mistake.`,
+        : `We couldn't approve your order for '${order.planName}' ($${order.amount.toFixed(2)}, paid with ${order.paymentMethod || 'manual payment'}).\n\nReason: ${order.adminNote}\n\n${refunded > 0 ? `$${refunded.toFixed(2)} has been refunded to your account credits.\n\n` : ''}Please double-check the details and try checking out again, or contact support if you believe this is a mistake.`,
       isRead: false,
       isBroadcast: false,
       createdAt: new Date().toISOString()
@@ -866,9 +922,13 @@ router.post('/orders/:id/reject', async (req: AuthenticatedRequest, res: Respons
 
   saveDbSync();
 
-  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_REJECT_PAYMENT', order.id, `Rejected manual payment #${order.id} for user ${order.userEmail}`);
+  await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_REJECT_PAYMENT', order.id, `Rejected order #${order.id} for user ${order.userEmail}${refunded > 0 ? ` — refunded $${refunded.toFixed(2)} in credits` : ''}`);
 
-  res.json({ success: true, message: `Payment #${order.id} rejected.`, data: order });
+  res.json({
+    success: true,
+    message: refunded > 0 ? `Order #${order.id} rejected. $${refunded.toFixed(2)} refunded to the customer's credits.` : `Payment #${order.id} rejected.`,
+    data: order
+  });
 });
 
 // --- SUPPORT DESK MANAGEMENT ---
