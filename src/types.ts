@@ -51,7 +51,9 @@ export interface UserAllocationStatus {
   unlimited: boolean;
 }
 
-export type ProductCategory = 'minecraft' | 'bot' | 'other';
+// Freeform — product categories are fully admin-managed (create/rename/delete),
+// so this is no longer limited to a fixed set of built-in values.
+export type ProductCategory = string;
 
 // A selectable application/egg a customer can deploy for this product
 // (e.g. "Node.js", "Python"). Internals (nestId/eggId/dockerImage/startup/
@@ -591,6 +593,9 @@ export interface Order {
   status: 'paid' | 'pending' | 'failed' | 'refunded';
   paymentMethod: string;
   transactionRef?: string;
+  // Which store the gift card was purchased from — only set when
+  // paymentMethod is a gift card deposit. transactionRef holds the code.
+  giftCardType?: 'amazon' | 'playstore';
   proofUrl?: string;
   adminNote?: string;
   provisionId?: string;
@@ -754,6 +759,16 @@ export interface PaymentGatewaySettings {
   stripe: {
     enabled: boolean;
     instructions: string;
+  };
+  // Manual gift card redemption — customer submits a code, staff verifies it
+  // and approves the deposit (same approval queue as UPI/Bank). Amazon and
+  // Google Play are the only supported stores.
+  giftCard: {
+    enabled: boolean;
+    amazonEnabled: boolean;
+    amazonInstructions: string;
+    playStoreEnabled: boolean;
+    playStoreInstructions: string;
   };
 }
 
