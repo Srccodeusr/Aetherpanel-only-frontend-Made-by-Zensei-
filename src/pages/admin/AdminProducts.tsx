@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Edit, Trash2, Check, X, RefreshCw, Layers, ShieldCheck, Server, Link2 } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Check, X, RefreshCw, Layers, ShieldCheck, Server, Link2, FolderPlus } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { Plan, Product, PanelEggOption, PanelLocationOption } from '../../types';
 
@@ -35,6 +35,18 @@ export const AdminProducts: React.FC = () => {
   const [testingOptionId, setTestingOptionId] = useState<string | null>(null);
   const [eggTestResults, setEggTestResults] = useState<Record<string, { type: 'success' | 'error'; text: string }>>({});
 
+  // Category (Product) Create/Edit Modal — categories are fully
+  // admin-managed: create, rename, restyle, or delete any of them.
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState('');
+  const [categorySlug, setCategorySlug] = useState('');
+  const [categoryDescription, setCategoryDescription] = useState('');
+  const [categoryIcon, setCategoryIcon] = useState('Gamepad2');
+  const [categoryTag, setCategoryTag] = useState('other');
+  const [categoryIsActive, setCategoryIsActive] = useState(true);
+  const [savingCategory, setSavingCategory] = useState(false);
+
   // Feedback notification
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -63,8 +75,12 @@ export const AdminProducts: React.FC = () => {
   }, []);
 
   const handleOpenCreateModal = () => {
+    if (products.length === 0) {
+      showToast('error', 'Create a category first, then add plans to it.');
+      return;
+    }
     setEditingPlanId(null);
-    setProductId(products[0]?.id || 'prod_minecraft');
+    setProductId(products[0]?.id || '');
     setName('');
     setDescription('');
     setRamMB(4096);
@@ -158,6 +174,78 @@ export const AdminProducts: React.FC = () => {
   const filteredPlans = plans.filter(p =>
     selectedProductFilter === 'all' || p.productId === selectedProductFilter
   );
+
+  // --- Category (Product) management: create, edit, delete ---
+  const handleOpenCreateCategory = () => {
+    setEditingCategoryId(null);
+    setCategoryName('');
+    setCategorySlug('');
+    setCategoryDescription('');
+    setCategoryIcon('Gamepad2');
+    setCategoryTag('other');
+    setCategoryIsActive(true);
+    setShowCategoryModal(true);
+  };
+
+  const handleOpenEditCategory = (prod: Product) => {
+    setEditingCategoryId(prod.id);
+    setCategoryName(prod.name);
+    setCategorySlug(prod.slug || '');
+    setCategoryDescription(prod.description || '');
+    setCategoryIcon(prod.icon || 'Gamepad2');
+    setCategoryTag(prod.category || 'other');
+    setCategoryIsActive(prod.isActive !== false);
+    setShowCategoryModal(true);
+  };
+
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryName.trim()) {
+      showToast('error', 'Category name is required');
+      return;
+    }
+    setSavingCategory(true);
+
+    const payload = {
+      name: categoryName.trim(),
+      slug: categorySlug.trim() || categoryName.trim(),
+      description: categoryDescription.trim(),
+      icon: categoryIcon.trim() || 'Gamepad2',
+      category: categoryTag.trim() || 'other',
+      isActive: categoryIsActive
+    };
+
+    const isEdit = !!editingCategoryId;
+    const url = isEdit ? `/admin/products/${editingCategoryId}` : '/admin/products';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const res = await apiRequest(url, { method, body: JSON.stringify(payload) });
+
+    if (res.success) {
+      showToast('success', res.message || `Category ${isEdit ? 'updated' : 'created'} successfully`);
+      setShowCategoryModal(false);
+      fetchPlans();
+    } else {
+      showToast('error', res.error?.message || 'Failed to save category');
+    }
+    setSavingCategory(false);
+  };
+
+  const handleDeleteCategory = async (prod: Product) => {
+    const planCount = plans.filter(p => p.productId === prod.id).length;
+    const warning = planCount > 0
+      ? `Delete category '${prod.name}'? This will also delete ${planCount} plan${planCount === 1 ? '' : 's'} nested under it. This cannot be undone.`
+      : `Delete category '${prod.name}'? This cannot be undone.`;
+    if (!window.confirm(warning)) return;
+
+    const res = await apiRequest(`/admin/products/${prod.id}`, { method: 'DELETE' });
+    if (res.success) {
+      showToast('success', res.message || `Category '${prod.name}' deleted`);
+      fetchPlans();
+    } else {
+      showToast('error', res.error?.message || 'Failed to delete category');
+    }
+  };
 
   const genOptionId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 
@@ -275,11 +363,76 @@ export const AdminProducts: React.FC = () => {
 
           <button
             onClick={handleOpenCreateModal}
-            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/10 transition-all"
+            disabled={products.length === 0}
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4" /> Create New Plan
           </button>
         </div>
+      </div>
+
+      {/* Product Categories — fully admin-managed: create, edit, delete */}
+      <div className="p-5 rounded-3xl bg-zinc-900 border border-zinc-800 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-amber-400" />
+            <h3 className="text-sm font-bold text-white">Product Categories</h3>
+          </div>
+          <button
+            onClick={handleOpenCreateCategory}
+            className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center gap-1.5"
+          >
+            <FolderPlus className="h-3.5 w-3.5" /> New Category
+          </button>
+        </div>
+        <p className="text-[11px] text-zinc-500 -mt-2">
+          Categories group plans (e.g. Discord Bot, Minecraft) — create as many as you need, rename them, or delete the defaults. Deleting a category also deletes its plans.
+        </p>
+
+        {loading ? (
+          <p className="text-xs text-zinc-500 text-center py-6">Loading categories...</p>
+        ) : products.length === 0 ? (
+          <div className="p-8 text-center border border-dashed border-zinc-800 rounded-2xl">
+            <p className="text-xs text-zinc-500">No categories yet — create one to start adding plans.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {products.map((prod) => {
+              const planCount = plans.filter(p => p.productId === prod.id).length;
+              return (
+                <div key={prod.id} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{prod.name}</p>
+                      <p className="text-[10px] text-zinc-500 font-mono truncate">/{prod.slug}</p>
+                    </div>
+                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono border ${prod.isActive !== false ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                      {prod.isActive !== false ? 'Active' : 'Hidden'}
+                    </span>
+                  </div>
+                  {prod.description && (
+                    <p className="text-[11px] text-zinc-500 line-clamp-2">{prod.description}</p>
+                  )}
+                  <p className="text-[10px] text-zinc-600">{planCount} plan{planCount === 1 ? '' : 's'}</p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => handleOpenEditCategory(prod)}
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1.5"
+                    >
+                      <Edit className="h-3.5 w-3.5" /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(prod)}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[11px] font-semibold flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Panel Deployment Mapping */}
@@ -778,6 +931,106 @@ export const AdminProducts: React.FC = () => {
                 className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-xs text-zinc-950 font-bold rounded-xl disabled:opacity-50"
               >
                 {savingEggMapping ? 'Saving...' : 'Save Mapping'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Category (Product) Create/Edit Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <form onSubmit={handleSaveCategory} className="w-full max-w-md bg-zinc-950 border border-zinc-800 p-6 rounded-3xl space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <h3 className="text-base font-bold text-white">
+                {editingCategoryId ? 'Edit Category' : 'New Category'}
+              </h3>
+              <button type="button" onClick={() => setShowCategoryModal(false)} className="text-zinc-500 hover:text-zinc-300">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-300 mb-1">Name *</label>
+              <input
+                type="text"
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                placeholder="e.g. VPS Hosting"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-300 mb-1">Slug (URL-safe, optional)</label>
+              <input
+                type="text"
+                value={categorySlug}
+                onChange={(e) => setCategorySlug(e.target.value)}
+                placeholder="auto-generated from name if left blank"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-zinc-300 mb-1">Description</label>
+              <textarea
+                value={categoryDescription}
+                onChange={(e) => setCategoryDescription(e.target.value)}
+                rows={2}
+                placeholder="Shown to customers browsing this category"
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-zinc-300 mb-1">Icon (lucide-react name)</label>
+                <input
+                  type="text"
+                  value={categoryIcon}
+                  onChange={(e) => setCategoryIcon(e.target.value)}
+                  placeholder="e.g. Gamepad2, Bot, Server"
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-300 mb-1">Category Tag</label>
+                <input
+                  type="text"
+                  value={categoryTag}
+                  onChange={(e) => setCategoryTag(e.target.value)}
+                  placeholder="e.g. bot, minecraft, vps"
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-xs text-zinc-300">
+              <input
+                type="checkbox"
+                checked={categoryIsActive}
+                onChange={(e) => setCategoryIsActive(e.target.checked)}
+                className="h-4 w-4 accent-amber-500 rounded"
+              />
+              Active (visible to customers)
+            </label>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="px-4 py-2 bg-zinc-900 text-xs text-zinc-300 rounded-xl hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingCategory}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-xs text-zinc-950 font-bold rounded-xl disabled:opacity-50"
+              >
+                {savingCategory ? 'Saving...' : editingCategoryId ? 'Save Changes' : 'Create Category'}
               </button>
             </div>
           </form>

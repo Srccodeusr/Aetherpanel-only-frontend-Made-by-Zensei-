@@ -4,7 +4,7 @@ import {
   XCircle, Clock, AlertCircle, RefreshCw,
   ShieldCheck, Sparkles, Loader2, CheckCircle,
   AlertTriangle, HelpCircle, Key, Lock, Shield, Globe, Copy,
-  Plus, Trash2, Edit3, X, Disc as DiscordIcon, Twitter, Github, Share2
+  Plus, Trash2, Edit3, X, Disc as DiscordIcon, Twitter, Github, Share2, Gift
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { useBranding } from '../../lib/BrandingContext';
@@ -120,6 +120,13 @@ export const AdminSettings: React.FC = () => {
     stripe: {
       enabled: true,
       instructions: 'Instant automatic payment via Credit/Debit Card or Wallet.'
+    },
+    giftCard: {
+      enabled: true,
+      amazonEnabled: true,
+      amazonInstructions: 'Buy an Amazon gift card for the deposit amount and enter the redeem code below. Your balance is added once a staff member verifies the code.',
+      playStoreEnabled: true,
+      playStoreInstructions: 'Buy a Google Play gift card for the deposit amount and enter the redeem code below. Your balance is added once a staff member verifies the code.'
     }
   });
 
@@ -387,8 +394,10 @@ export const AdminSettings: React.FC = () => {
     if (res.success) {
       setActionMsg(res.message || 'Payment approved!');
       fetchPendingOrders();
-      setTimeout(() => setActionMsg(null), 4000);
+    } else {
+      setActionMsg(res.error?.message || 'Failed to approve order.');
     }
+    setTimeout(() => setActionMsg(null), 5000);
   };
 
   const handleRejectOrder = async (orderId: string) => {
@@ -1345,6 +1354,68 @@ export const AdminSettings: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Gift Card Gateway (Amazon & Google Play only) */}
+          <div className="p-5 rounded-2xl bg-zinc-950/80 border border-zinc-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Gift className="h-4 w-4 text-amber-400" />
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">Gift Card (Amazon / Google Play)</h3>
+              </div>
+              <input
+                type="checkbox"
+                checked={gateways.giftCard.enabled}
+                onChange={(e) => setGateways({ ...gateways, giftCard: { ...gateways.giftCard, enabled: e.target.checked } })}
+                className="h-4 w-4 accent-amber-500 rounded"
+              />
+            </div>
+
+            {gateways.giftCard.enabled && (
+              <div className="space-y-4">
+                <p className="text-[11px] text-zinc-500">Customers submit a gift card code; it stays pending until a staff member verifies it and approves the deposit from the Pending Orders tab.</p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-300 font-semibold">Amazon Gift Card</label>
+                      <input
+                        type="checkbox"
+                        checked={gateways.giftCard.amazonEnabled}
+                        onChange={(e) => setGateways({ ...gateways, giftCard: { ...gateways.giftCard, amazonEnabled: e.target.checked } })}
+                        className="h-3.5 w-3.5 accent-amber-500 rounded"
+                      />
+                    </div>
+                    <textarea
+                      value={gateways.giftCard.amazonInstructions}
+                      onChange={(e) => setGateways({ ...gateways, giftCard: { ...gateways.giftCard, amazonInstructions: e.target.value } })}
+                      rows={3}
+                      placeholder="Instructions shown to the customer for Amazon gift cards"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-xs resize-none"
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-zinc-300 font-semibold">Google Play Gift Card</label>
+                      <input
+                        type="checkbox"
+                        checked={gateways.giftCard.playStoreEnabled}
+                        onChange={(e) => setGateways({ ...gateways, giftCard: { ...gateways.giftCard, playStoreEnabled: e.target.checked } })}
+                        className="h-3.5 w-3.5 accent-amber-500 rounded"
+                      />
+                    </div>
+                    <textarea
+                      value={gateways.giftCard.playStoreInstructions}
+                      onChange={(e) => setGateways({ ...gateways, giftCard: { ...gateways.giftCard, playStoreInstructions: e.target.value } })}
+                      rows={3}
+                      placeholder="Instructions shown to the customer for Google Play gift cards"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-xs resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </form>
       )}
 
@@ -1378,17 +1449,24 @@ export const AdminSettings: React.FC = () => {
                   className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
                 >
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-bold text-white font-mono">{order.id}</span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase font-bold">
                         {order.paymentMethod || 'MANUAL'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono border uppercase font-bold ${
+                        order.planId === 'credit_deposit'
+                          ? 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                          : 'bg-violet-500/10 text-violet-400 border-violet-500/20'
+                      }`}>
+                        {order.planId === 'credit_deposit' ? 'Credit Top-up' : 'Plan Purchase'}
                       </span>
                     </div>
                     <div className="text-xs text-zinc-300">
                       Amount: <strong className="text-emerald-400 font-mono">${order.amount.toFixed(2)}</strong> ({order.planName})
                     </div>
                     <div className="text-[11px] text-zinc-400 font-mono">
-                      Ref / UTR: <span className="text-white font-bold">{order.transactionRef || 'None provided'}</span>
+                      Ref / UTR / Code: <span className="text-white font-bold">{order.transactionRef || 'None provided'}</span>
                     </div>
                     <div className="text-[10px] text-zinc-500">
                       Submitted: {new Date(order.createdAt).toLocaleString()}
