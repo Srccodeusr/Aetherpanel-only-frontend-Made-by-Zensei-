@@ -296,6 +296,12 @@ const defaultStatusComponents: StatusComponent[] = [
   }
 ];
 
+// Deep copy so runtime edits (delete/rename a category, edit a plan) never
+// mutate the module-level defaults shared by every fresh database.
+function cloneDefaults<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
 let dbCache: DatabaseSchema | null = null;
 let initPromise: Promise<DatabaseSchema> | null = null;
 let saveTimeout: NodeJS.Timeout | null = null;
@@ -305,8 +311,8 @@ function defaultDb(): DatabaseSchema {
     installationId: getInstallationId(),
     users: [],
     passwords: {},
-    products: defaultProducts,
-    plans: defaultPlans,
+    products: cloneDefaults(defaultProducts),
+    plans: cloneDefaults(defaultPlans),
     orders: [],
     coupons: [],
     tickets: [],
@@ -382,9 +388,21 @@ export async function getDb(reload = false): Promise<DatabaseSchema> {
       }
 
       if (dbCache) {
-        // Backfill defaults for fields that may be missing from an older/imported DB
-        if (!dbCache.products || dbCache.products.length === 0) dbCache.products = defaultProducts;
-        if (!dbCache.plans || dbCache.plans.length === 0) dbCache.plans = defaultPlans;
+        // Backfill defaults for fields that may be missing from an older/imported DB.
+        // Categories and plans are only seeded when the field is MISSING — an
+        // empty list means the admin deleted them on purpose, and re-seeding on
+        // every restart would bring a deleted category (e.g. Minecraft) back.
+        if (!Array.isArray(dbCache.products)) dbCache.products = cloneDefaults(defaultProducts);
+        if (!Array.isArray(dbCache.plans)) dbCache.plans = cloneDefaults(defaultPlans);
+        // Any collection the routes call .unshift()/.filter() on must exist,
+        // otherwise those routes throw (e.g. writing an audit log on delete).
+        if (!Array.isArray(dbCache.users)) dbCache.users = [];
+        if (!dbCache.passwords || typeof dbCache.passwords !== 'object') dbCache.passwords = {};
+        if (!Array.isArray(dbCache.orders)) dbCache.orders = [];
+        if (!Array.isArray(dbCache.coupons)) dbCache.coupons = [];
+        if (!Array.isArray(dbCache.tickets)) dbCache.tickets = [];
+        if (!Array.isArray(dbCache.announcements)) dbCache.announcements = [];
+        if (!Array.isArray(dbCache.auditLogs)) dbCache.auditLogs = [];
         if (!dbCache.settings) dbCache.settings = defaultSettings;
         if (!dbCache.mail) dbCache.mail = [];
         if (!dbCache.ads) dbCache.ads = [];
