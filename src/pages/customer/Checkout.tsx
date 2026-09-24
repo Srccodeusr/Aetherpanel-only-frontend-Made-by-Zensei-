@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, ShieldCheck, Loader2, CheckCircle2, AlertTriangle, Tag,
-  Server, Copy, ExternalLink, DollarSign, Clock, Gamepad2, Bot as BotIcon, Rocket
+  Server, Copy, ExternalLink, DollarSign, Clock, Gamepad2, Bot as BotIcon, Rocket, Gift
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { useAuth } from '../../lib/AuthContext';
 import { useTheme } from '../../lib/ThemeContext';
-import { Plan, Product } from '../../types';
+import { Plan, Product, PaymentGatewaySettings } from '../../types';
 
 interface CheckoutProps {
   onNavigate: (page: string, params?: any) => void;
@@ -75,6 +75,25 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Payment method — Account Credits (instant, deducts from balance) or Gift
+  // Card (Amazon/Google Play — paid entirely by the code, no credits involved;
+  // stays pending until a staff member verifies it and approves the order).
+  const [paymentMethod, setPaymentMethod] = useState<'credits' | 'giftcard'>('credits');
+  const [giftCardType, setGiftCardType] = useState<'amazon' | 'playstore'>('amazon');
+  const [giftCardCode, setGiftCardCode] = useState('');
+  const [gateways, setGateways] = useState<PaymentGatewaySettings | null>(null);
+  // Set once a gift card order has been submitted — distinct from `provision`
+  // since there's no provisioning record yet (that only starts once staff approve it).
+  const [submittedForApproval, setSubmittedForApproval] = useState<{ planName: string } | null>(null);
+
+  useEffect(() => {
+    const loadGateways = async () => {
+      const res = await apiRequest('/billing/payment-methods');
+      if (res.success && res.data) setGateways(res.data);
+    };
+    loadGateways();
+  }, []);
+
   useEffect(() => {
     const load = async () => {
       if (!planId) { setLoadingPlan(false); return; }
@@ -131,9 +150,15 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
       setCheckoutError('Choose a deploy location.');
       return;
     }
+    if (price > 0 && paymentMethod === 'giftcard' && !giftCardCode.trim()) {
+      setCheckoutError('Enter your gift card code before submitting.');
+      return;
+    }
 
     setSubmitting(true);
     setCheckoutError(null);
+
+    const useGiftCard = price > 0 && paymentMethod === 'giftcard';
 
     const res = await apiRequest('/billing/checkout', {
       method: 'POST',
@@ -144,7 +169,10 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
         serverName: serverName.trim() || undefined,
         serverDescription: serverDescription.trim() || undefined,
         selectedEggOptionId: selectedEggOptionId || undefined,
-        selectedLocationOptionId: selectedLocationOptionId || undefined
+        selectedLocationOptionId: selectedLocationOptionId || undefined,
+        paymentMethod: useGiftCard ? 'giftcard' : undefined,
+        giftCardType: useGiftCard ? giftCardType : undefined,
+        transactionRef: useGiftCard ? giftCardCode.trim() : undefined
       })
     });
 
@@ -155,6 +183,13 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
     }
 
     await refreshUser();
+
+    if (res.data.pendingApproval) {
+      setSubmittedForApproval({ planName: plan.name });
+      setSubmitting(false);
+      return;
+    }
+
     const provisionId = res.data.provisionId;
     setProvision({ id: provisionId, status: 'pending', message: 'Verifying your order...' });
     startPolling(provisionId);
@@ -191,6 +226,31 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
       <div className="p-8 text-center text-xs text-zinc-400 space-y-2 pt-16">
         <Loader2 className="h-5 w-5 animate-spin text-violet-400 mx-auto" />
         <p>Loading plan details...</p>
+      </div>
+    );
+  }
+
+  // --- Gift card order submitted, awaiting staff verification (no
+  // provisioning record exists yet — that only starts once it's approved) ---
+  if (submittedForApproval) {
+    return (
+      <div className="p-4 sm:p-6 max-w-xl mx-auto pt-10">
+        <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-8 space-y-6 text-center">
+          <Clock className="h-12 w-12 text-amber-400 mx-auto" />
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-white">Gift card submitted</h2>
+            <p className="text-xs text-zinc-400">
+              A staff member will verify your code for <strong className="text-white">{submittedForApproval.planName}</strong>.
+              Once approved, we'll set up your server automatically — or mail you here if a manual step is needed.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('dashboard')}
+            className="w-full py-2.5 rounded-xl font-semibold text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 hover:text-white hover:border-zinc-700"
+          >
+            Go to Dashboard
+          </button>
+        </div>
       </div>
     );
   }
@@ -285,7 +345,10 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
               <Clock className="h-12 w-12 text-amber-400 mx-auto" />
               <div className="space-y-1">
                 <h2 className="text-lg font-bold text-white">Order confirmed</h2>
-                <p className="text-xs text-zinc-400">{provision.message}</p>
+                {/* The panel isn't linked/auto-provisioned for this order — a human has
+                    to finish it, so always show this fixed message rather than the
+                    internal provisioning-step message. */}
+                <p className="text-xs text-zinc-400">Please wait until a staff member mails you about your server or VPS credentials.</p>
               </div>
               {provision.panelUsername && (
                 <div className="text-left space-y-2 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-xs">
@@ -490,22 +553,101 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
           </div>
         )}
 
-        <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-4 space-y-2">
-          <div className="flex justify-between text-xs text-zinc-400">
-            <span>Plan price ({billingCycle})</span>
-            <span className="font-mono text-white">${cyclePrice.toFixed(2)}</span>
+        {cyclePrice > 0 && (
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 mb-2">Payment Method</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('credits')}
+                className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
+                  paymentMethod === 'credits' ? 'border-violet-500 bg-violet-500/10 text-white font-bold' : 'border-zinc-800 bg-zinc-950 text-zinc-400'
+                }`}
+              >
+                <DollarSign className="h-5 w-5 text-violet-400" />
+                <span className="text-xs">Account Credits</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('giftcard')}
+                className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
+                  paymentMethod === 'giftcard' ? 'border-amber-500 bg-amber-500/10 text-white font-bold' : 'border-zinc-800 bg-zinc-950 text-zinc-400'
+                }`}
+              >
+                <Gift className="h-5 w-5 text-amber-400" />
+                <span className="text-xs">Gift Card</span>
+              </button>
+            </div>
           </div>
-          <div className="flex justify-between text-xs text-zinc-400">
-            <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> Your credit balance</span>
-            <span className={`font-mono ${canAfford ? 'text-emerald-400' : 'text-rose-400'}`}>${credits.toFixed(2)}</span>
+        )}
+
+        {(cyclePrice === 0 || paymentMethod === 'credits') && (
+          <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-4 space-y-2">
+            <div className="flex justify-between text-xs text-zinc-400">
+              <span>Plan price ({billingCycle})</span>
+              <span className="font-mono text-white">${cyclePrice.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs text-zinc-400">
+              <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> Your credit balance</span>
+              <span className={`font-mono ${canAfford ? 'text-emerald-400' : 'text-rose-400'}`}>${credits.toFixed(2)}</span>
+            </div>
+            {!canAfford && cyclePrice > 0 && (
+              <p className="text-[11px] text-rose-400 pt-1">
+                You need ${(cyclePrice - credits).toFixed(2)} more in credits.{' '}
+                <button onClick={() => onNavigate('billing')} className="underline hover:text-rose-300">Add credits</button>
+              </p>
+            )}
           </div>
-          {!canAfford && cyclePrice > 0 && (
-            <p className="text-[11px] text-rose-400 pt-1">
-              You need ${(cyclePrice - credits).toFixed(2)} more in credits.{' '}
-              <button onClick={() => onNavigate('billing')} className="underline hover:text-rose-300">Add credits</button>
+        )}
+
+        {cyclePrice > 0 && paymentMethod === 'giftcard' && (
+          <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3 text-xs">
+            <div className="flex justify-between text-xs text-zinc-300">
+              <span>Plan price ({billingCycle})</span>
+              <span className="font-mono text-white font-bold">${cyclePrice.toFixed(2)}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setGiftCardType('amazon')}
+                disabled={gateways?.giftCard && !gateways.giftCard.amazonEnabled}
+                className={`p-2.5 rounded-xl border font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  giftCardType === 'amazon' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-400'
+                }`}
+              >
+                Amazon Gift Card
+              </button>
+              <button
+                type="button"
+                onClick={() => setGiftCardType('playstore')}
+                disabled={gateways?.giftCard && !gateways.giftCard.playStoreEnabled}
+                className={`p-2.5 rounded-xl border font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  giftCardType === 'playstore' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-400'
+                }`}
+              >
+                Google Play Gift Card
+              </button>
+            </div>
+
+            <p className="text-[11px] text-zinc-400 bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+              Buy {giftCardType === 'amazon' ? 'an Amazon' : 'a Google Play'} gift card worth ${cyclePrice.toFixed(2)} and enter the code below.{' '}
+              {giftCardType === 'amazon' ? gateways?.giftCard?.amazonInstructions : gateways?.giftCard?.playStoreInstructions}
             </p>
-          )}
-        </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-amber-400 mb-1">Enter Gift Card Code *</label>
+              <input
+                type="text"
+                value={giftCardCode}
+                onChange={(e) => setGiftCardCode(e.target.value)}
+                placeholder="e.g. XXXX-XXXXXX-XXXX"
+                className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+              />
+              <p className="text-[10px] text-zinc-500 mt-1">No credits are used — a staff member verifies this code and your server is set up once approved.</p>
+            </div>
+          </div>
+        )}
 
         {checkoutError && (
           <p className="text-xs p-3 rounded-xl border font-semibold bg-rose-500/10 text-rose-400 border-rose-500/20">
@@ -515,13 +657,21 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
 
         <button
           onClick={handleCheckout}
-          disabled={submitting || (!canAfford && cyclePrice > 0)}
+          disabled={
+            submitting ||
+            (cyclePrice > 0 && paymentMethod === 'credits' && !canAfford) ||
+            (cyclePrice > 0 && paymentMethod === 'giftcard' && !giftCardCode.trim())
+          }
           className={`w-full py-3.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 disabled:opacity-50 bg-gradient-to-r ${accentClasses.gradient}`}
         >
           {submitting ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
+          ) : cyclePrice === 0 ? (
+            <><ShieldCheck className="h-4 w-4" /> Activate Free Plan</>
+          ) : paymentMethod === 'giftcard' ? (
+            <><Gift className="h-4 w-4" /> Submit Gift Card for Verification</>
           ) : (
-            <><ShieldCheck className="h-4 w-4" /> {cyclePrice > 0 ? `Confirm & Pay $${cyclePrice.toFixed(2)}` : 'Activate Free Plan'}</>
+            <><ShieldCheck className="h-4 w-4" /> Confirm & Pay ${cyclePrice.toFixed(2)}</>
           )}
         </button>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, DollarSign, Tag, Check, RefreshCw, PlusCircle, ArrowUpRight, ShieldCheck, ShoppingBag, QrCode, Building, Copy, CheckCircle2 } from 'lucide-react';
+import { CreditCard, DollarSign, Tag, Check, RefreshCw, PlusCircle, ArrowUpRight, ShieldCheck, ShoppingBag, QrCode, Building, Copy, CheckCircle2, Gift } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { Order, PaymentGatewaySettings } from '../../types';
 import { useAuth } from '../../lib/AuthContext';
@@ -17,7 +17,8 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [showAddCreditsModal, setShowAddCreditsModal] = useState(false);
   const [creditAmount, setCreditAmount] = useState<number>(25);
-  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'bank' | 'stripe'>('upi');
+  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'bank' | 'giftcard' | 'stripe'>('upi');
+  const [giftCardType, setGiftCardType] = useState<'amazon' | 'playstore'>('amazon');
   const [transactionRef, setTransactionRef] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -58,8 +59,16 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
       method: 'POST',
       body: JSON.stringify({
         amount: creditAmount,
-        paymentMethod: selectedMethod === 'upi' ? 'UPI / QR Code' : selectedMethod === 'bank' ? 'Bank Transfer' : 'Stripe / Card',
-        transactionRef: ['upi', 'bank'].includes(selectedMethod) ? transactionRef.trim() : undefined
+        methodType: selectedMethod,
+        paymentMethod: selectedMethod === 'upi'
+          ? 'UPI / QR Code'
+          : selectedMethod === 'bank'
+            ? 'Bank Transfer'
+            : selectedMethod === 'giftcard'
+              ? `Gift Card - ${giftCardType === 'playstore' ? 'Google Play' : 'Amazon'}`
+              : 'Stripe / Card',
+        giftCardType: selectedMethod === 'giftcard' ? giftCardType : undefined,
+        transactionRef: ['upi', 'bank', 'giftcard'].includes(selectedMethod) ? transactionRef.trim() : undefined
       })
     });
 
@@ -259,7 +268,7 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
             {/* Select Payment Gateway */}
             <div>
               <label className="block text-xs font-semibold text-zinc-300 mb-2">2. Select Payment Method</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   onClick={() => setSelectedMethod('upi')}
                   className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
@@ -278,6 +287,16 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
                 >
                   <Building className="h-5 w-5 text-emerald-400" />
                   <span className="text-xs">Bank Transfer</span>
+                </button>
+
+                <button
+                  onClick={() => setSelectedMethod('giftcard')}
+                  className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
+                    selectedMethod === 'giftcard' ? 'border-amber-500 bg-amber-500/10 text-white font-bold' : 'border-zinc-800 bg-zinc-900 text-zinc-400'
+                  }`}
+                >
+                  <Gift className="h-5 w-5 text-amber-400" />
+                  <span className="text-xs">Gift Card</span>
                 </button>
 
                 <button
@@ -345,6 +364,51 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
               </div>
             )}
 
+            {selectedMethod === 'giftcard' && (
+              <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGiftCardType('amazon')}
+                    disabled={gateways?.giftCard && !gateways.giftCard.amazonEnabled}
+                    className={`p-2.5 rounded-xl border font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      giftCardType === 'amazon' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-400'
+                    }`}
+                  >
+                    Amazon Gift Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGiftCardType('playstore')}
+                    disabled={gateways?.giftCard && !gateways.giftCard.playStoreEnabled}
+                    className={`p-2.5 rounded-xl border font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      giftCardType === 'playstore' ? 'border-amber-500 bg-amber-500/10 text-white' : 'border-zinc-800 bg-zinc-950 text-zinc-400'
+                    }`}
+                  >
+                    Google Play Gift Card
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-zinc-400 bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+                  {giftCardType === 'amazon'
+                    ? (gateways?.giftCard?.amazonInstructions || 'Buy an Amazon gift card for the deposit amount and enter the redeem code below.')
+                    : (gateways?.giftCard?.playStoreInstructions || 'Buy a Google Play gift card for the deposit amount and enter the redeem code below.')}
+                </p>
+
+                <div>
+                  <label className="block text-xs font-semibold text-amber-400 mb-1">Enter Gift Card Code *</label>
+                  <input
+                    type="text"
+                    value={transactionRef}
+                    onChange={(e) => setTransactionRef(e.target.value)}
+                    placeholder="e.g. XXXX-XXXXXX-XXXX"
+                    className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1">Only Amazon and Google Play gift cards are accepted. Your balance is credited after a staff member verifies the code.</p>
+                </div>
+              </div>
+            )}
+
             {selectedMethod === 'stripe' && (
               <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2 text-xs">
                 <div className="flex justify-between text-zinc-400">
@@ -375,7 +439,7 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
               </button>
               <button
                 onClick={handleAddCredits}
-                disabled={isProcessingPayment || (['upi', 'bank'].includes(selectedMethod) && !transactionRef.trim())}
+                disabled={isProcessingPayment || (['upi', 'bank', 'giftcard'].includes(selectedMethod) && !transactionRef.trim())}
                 className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-xs font-semibold text-white shadow-md disabled:opacity-50"
               >
                 {isProcessingPayment ? 'Submitting...' : selectedMethod === 'stripe' ? `Pay $${creditAmount.toFixed(2)}` : 'Submit for Verification'}
