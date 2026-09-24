@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, ShieldCheck, Loader2, CheckCircle2, AlertTriangle, Tag,
-  Server, Copy, ExternalLink, DollarSign, Clock, Gamepad2, Bot as BotIcon, Rocket, Gift
+  Server, Copy, ExternalLink, DollarSign, Clock, Gamepad2, Bot as BotIcon, Rocket, Gift, Mail as MailIcon
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { useAuth } from '../../lib/AuthContext';
@@ -75,16 +75,17 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Payment method — Account Credits (instant, deducts from balance) or Gift
-  // Card (Amazon/Google Play — paid entirely by the code, no credits involved;
-  // stays pending until a staff member verifies it and approves the order).
+  // Payment method — Account Credits (price is deducted right away) or Gift
+  // Card (Amazon/Google Play — paid entirely by the code, no credits involved).
+  // Either way a paid order stays pending until a staff member verifies it and
+  // approves it — only then is the service set up / credentials sent.
   const [paymentMethod, setPaymentMethod] = useState<'credits' | 'giftcard'>('credits');
   const [giftCardType, setGiftCardType] = useState<'amazon' | 'playstore'>('amazon');
   const [giftCardCode, setGiftCardCode] = useState('');
   const [gateways, setGateways] = useState<PaymentGatewaySettings | null>(null);
-  // Set once a gift card order has been submitted — distinct from `provision`
-  // since there's no provisioning record yet (that only starts once staff approve it).
-  const [submittedForApproval, setSubmittedForApproval] = useState<{ planName: string } | null>(null);
+  // Set once a paid order has been submitted — distinct from `provision` since
+  // there's no provisioning record yet (that only starts once staff approve it).
+  const [submittedForApproval, setSubmittedForApproval] = useState<{ planName: string; amount: number; method: 'credits' | 'giftcard' } | null>(null);
 
   useEffect(() => {
     const loadGateways = async () => {
@@ -184,8 +185,12 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
 
     await refreshUser();
 
-    if (res.data.pendingApproval) {
-      setSubmittedForApproval({ planName: plan.name });
+    if (res.data?.pendingApproval) {
+      setSubmittedForApproval({
+        planName: plan.name,
+        amount: typeof res.data.order?.amount === 'number' ? res.data.order.amount : price,
+        method: useGiftCard ? 'giftcard' : 'credits'
+      });
       setSubmitting(false);
       return;
     }
@@ -230,26 +235,46 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
     );
   }
 
-  // --- Gift card order submitted, awaiting staff verification (no
-  // provisioning record exists yet — that only starts once it's approved) ---
+  // --- Payment submitted, awaiting staff verification (no provisioning record
+  // exists yet — that only starts once a staff member approves the order) ---
   if (submittedForApproval) {
     return (
       <div className="p-4 sm:p-6 max-w-xl mx-auto pt-10">
         <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-8 space-y-6 text-center">
-          <Clock className="h-12 w-12 text-amber-400 mx-auto" />
-          <div className="space-y-1">
-            <h2 className="text-lg font-bold text-white">Gift card submitted</h2>
+          <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+          <div className="space-y-2">
+            <h2 className="text-lg font-bold text-white">Payment done successfully</h2>
             <p className="text-xs text-zinc-400">
-              A staff member will verify your code for <strong className="text-white">{submittedForApproval.planName}</strong>.
-              Once approved, we'll set up your server automatically — or mail you here if a manual step is needed.
+              Please wait for a staff member to verify your {submittedForApproval.method === 'giftcard' ? 'gift card' : 'payment'} for{' '}
+              <strong className="text-white">{submittedForApproval.planName}</strong> and send you your credentials.
             </p>
           </div>
-          <button
-            onClick={() => onNavigate('dashboard')}
-            className="w-full py-2.5 rounded-xl font-semibold text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 hover:text-white hover:border-zinc-700"
-          >
-            Go to Dashboard
-          </button>
+
+          <div className="flex items-center justify-center gap-2 text-[11px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+            <Clock className="h-3.5 w-3.5" /> Awaiting staff verification
+          </div>
+
+          <p className="text-[11px] text-zinc-500">
+            You don't need to stay on this page — we'll message you in your Mail inbox as soon as your order is approved.
+            {submittedForApproval.method === 'credits' && submittedForApproval.amount > 0 && (
+              <> If it can't be approved, your ${submittedForApproval.amount.toFixed(2)} is refunded to your account credits.</>
+            )}
+          </p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => onNavigate('mail')}
+              className="py-2.5 rounded-xl font-semibold text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 hover:text-white hover:border-zinc-700 inline-flex items-center justify-center gap-1.5"
+            >
+              <MailIcon className="h-3.5 w-3.5" /> Open Mail
+            </button>
+            <button
+              onClick={() => onNavigate('dashboard')}
+              className="py-2.5 rounded-xl font-semibold text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 hover:text-white hover:border-zinc-700"
+            >
+              Go to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -344,11 +369,11 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
             <>
               <Clock className="h-12 w-12 text-amber-400 mx-auto" />
               <div className="space-y-1">
-                <h2 className="text-lg font-bold text-white">Order confirmed</h2>
+                <h2 className="text-lg font-bold text-white">Payment done successfully</h2>
                 {/* The panel isn't linked/auto-provisioned for this order — a human has
                     to finish it, so always show this fixed message rather than the
                     internal provisioning-step message. */}
-                <p className="text-xs text-zinc-400">Please wait until a staff member mails you about your server or VPS credentials.</p>
+                <p className="text-xs text-zinc-400">Please wait for a staff member to verify your order and mail you your server or VPS credentials.</p>
               </div>
               {provision.panelUsername && (
                 <div className="text-left space-y-2 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-xs">
@@ -591,6 +616,11 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
               <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> Your credit balance</span>
               <span className={`font-mono ${canAfford ? 'text-emerald-400' : 'text-rose-400'}`}>${credits.toFixed(2)}</span>
             </div>
+            {cyclePrice > 0 && (
+              <p className="text-[10px] text-zinc-500 pt-1">
+                A staff member verifies every order before it's set up. Your credits are refunded if it can't be approved.
+              </p>
+            )}
             {!canAfford && cyclePrice > 0 && (
               <p className="text-[11px] text-rose-400 pt-1">
                 You need ${(cyclePrice - credits).toFixed(2)} more in credits.{' '}

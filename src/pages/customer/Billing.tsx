@@ -17,7 +17,7 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [showAddCreditsModal, setShowAddCreditsModal] = useState(false);
   const [creditAmount, setCreditAmount] = useState<number>(25);
-  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'bank' | 'giftcard' | 'stripe'>('upi');
+  const [selectedMethod, setSelectedMethod] = useState<'upi' | 'bank' | 'giftcard'>('upi');
   const [giftCardType, setGiftCardType] = useState<'amazon' | 'playstore'>('amazon');
   const [transactionRef, setTransactionRef] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -64,11 +64,9 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
           ? 'UPI / QR Code'
           : selectedMethod === 'bank'
             ? 'Bank Transfer'
-            : selectedMethod === 'giftcard'
-              ? `Gift Card - ${giftCardType === 'playstore' ? 'Google Play' : 'Amazon'}`
-              : 'Stripe / Card',
+            : `Gift Card - ${giftCardType === 'playstore' ? 'Google Play' : 'Amazon'}`,
         giftCardType: selectedMethod === 'giftcard' ? giftCardType : undefined,
-        transactionRef: ['upi', 'bank', 'giftcard'].includes(selectedMethod) ? transactionRef.trim() : undefined
+        transactionRef: transactionRef.trim()
       })
     });
 
@@ -211,18 +209,18 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
               <tbody className="divide-y divide-zinc-800/60">
                 {orders.map((o) => (
                   <tr key={o.id} className="hover:bg-zinc-900 transition-colors">
-                    <td className="p-3.5 font-mono text-violet-400 font-semibold">#{o.id.slice(0, 8)}</td>
+                    <td className="p-3.5 font-mono text-violet-400 font-semibold">#{o.id.slice(-8)}</td>
                     <td className="p-3.5 font-semibold text-white">{o.planName}</td>
                     <td className="p-3.5 font-mono text-emerald-400 font-bold">${o.amount.toFixed(2)}</td>
                     <td className="p-3.5 text-zinc-300">{o.paymentMethod}</td>
                     <td className="p-3.5 font-mono text-zinc-400">{o.transactionRef || '-'}</td>
                     <td className="p-3.5">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border capitalize ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono border ${
                         o.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                         o.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 font-bold' :
                         'bg-rose-500/10 text-rose-400 border-rose-500/20'
                       }`}>
-                        {o.status}
+                        {o.status === 'pending' ? 'Awaiting verification' : o.status === 'failed' ? 'Declined' : o.status === 'paid' ? 'Paid' : o.status}
                       </span>
                     </td>
                     <td className="p-3.5 text-right text-zinc-500">{o.createdAt}</td>
@@ -268,7 +266,7 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
             {/* Select Payment Gateway */}
             <div>
               <label className="block text-xs font-semibold text-zinc-300 mb-2">2. Select Payment Method</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setSelectedMethod('upi')}
                   className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
@@ -299,15 +297,6 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
                   <span className="text-xs">Gift Card</span>
                 </button>
 
-                <button
-                  onClick={() => setSelectedMethod('stripe')}
-                  className={`p-3 rounded-2xl border flex flex-col items-center gap-1.5 transition-all ${
-                    selectedMethod === 'stripe' ? 'border-cyan-500 bg-cyan-500/10 text-white font-bold' : 'border-zinc-800 bg-zinc-900 text-zinc-400'
-                  }`}
-                >
-                  <CreditCard className="h-5 w-5 text-cyan-400" />
-                  <span className="text-xs">Instant Card</span>
-                </button>
               </div>
             </div>
 
@@ -409,19 +398,6 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
               </div>
             )}
 
-            {selectedMethod === 'stripe' && (
-              <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2 text-xs">
-                <div className="flex justify-between text-zinc-400">
-                  <span>Instant Credit Amount:</span>
-                  <strong className="text-white">${creditAmount.toFixed(2)}</strong>
-                </div>
-                <div className="flex justify-between text-zinc-400">
-                  <span>Processing Gateway:</span>
-                  <strong className="text-cyan-400">Stripe Card Verification</strong>
-                </div>
-              </div>
-            )}
-
             {paymentMsg && (
               <p className={`text-xs p-3 rounded-xl border font-semibold ${
                 paymentMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
@@ -439,10 +415,10 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
               </button>
               <button
                 onClick={handleAddCredits}
-                disabled={isProcessingPayment || (['upi', 'bank', 'giftcard'].includes(selectedMethod) && !transactionRef.trim())}
+                disabled={isProcessingPayment || !transactionRef.trim()}
                 className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-xs font-semibold text-white shadow-md disabled:opacity-50"
               >
-                {isProcessingPayment ? 'Submitting...' : selectedMethod === 'stripe' ? `Pay $${creditAmount.toFixed(2)}` : 'Submit for Verification'}
+                {isProcessingPayment ? 'Submitting...' : 'Submit for Verification'}
               </button>
             </div>
           </div>
