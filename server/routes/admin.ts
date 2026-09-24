@@ -10,6 +10,38 @@ import { createProvisionRecord, runProvisioning } from '../services/provisioning
 
 const router = Router();
 
+// Queue an automatic notification into a customer's Mail inbox. Used by the
+// order approve / reject flow so the customer is ALWAYS told the outcome, and
+// so the mail is written the moment the order status changes (before any
+// provisioning work that could fail).
+function queueCustomerMail(
+  db: Awaited<ReturnType<typeof getDb>>,
+  sender: { id: string; role: any; displayName?: string; username?: string; email: string },
+  recipient: { id: string; email: string; displayName?: string; username?: string },
+  subject: string,
+  body: string
+): void {
+  const now = Date.now();
+  const mail: Mail = {
+    id: `mail_${now}_${Math.random().toString(36).substring(2, 8)}`,
+    batchId: `mbatch_${now}_${Math.random().toString(36).substring(2, 6)}`,
+    senderId: sender.id,
+    senderName: sender.displayName || sender.username || sender.email,
+    senderRole: sender.role,
+    recipientId: recipient.id,
+    recipientName: recipient.displayName || recipient.username || recipient.email,
+    recipientEmail: recipient.email,
+    subject,
+    body,
+    isRead: false,
+    isBroadcast: false,
+    createdAt: new Date(now).toISOString()
+  };
+  if (!Array.isArray(db.mail)) db.mail = [];
+  db.mail.unshift(mail);
+}
+
+
 // Require admin or support role for all routes in this router
 router.use(authMiddleware);
 router.use(requireRole(['admin', 'super_admin', 'support', 'moderator']));
@@ -450,12 +482,23 @@ const handleCreatePlan = async (req: AuthenticatedRequest, res: Response) => {
     ramMB, cpuCores, diskGB, backupLimit, databaseLimit, serverLimit, features, locations, isPopular
   } = req.body;
 
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Plan name is required.' } });
+  }
+
   const db = await getDb();
+
+  // The old code quietly fell back to 'prod_minecraft' when no category was
+  // sent. Once that category is deleted, the plan would be attached to nothing
+  // and never show up anywhere — so require a real, existing category instead.
+  if (!productId || !db.products.some(p => p.id === productId)) {
+    return res.status(400).json({ success: false, error: { code: 'CATEGORY_REQUIRED', message: 'Choose an existing category for this plan. (Create a category first if you have none.)' } });
+  }
 
   const newPlan: Plan = {
     id: `plan_${Date.now()}`,
-    productId: productId || 'prod_minecraft',
-    name: name.trim(),
+    productId,
+    name: String(name).trim(),
     description: description || '',
     priceMonthly: parseFloat(priceMonthly) || 0,
     priceYearly: parseFloat(priceYearly) || ((parseFloat(priceMonthly) || 0) * 10),
@@ -747,7 +790,6 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
   }
 
   const targetUser = db.users.find(u => u.id === order.userId);
-  const approverName = req.user!.displayName || req.user!.username || req.user!.email;
   // credit_deposit orders are Add-Credits top-ups (UPI/Bank/Gift Card) — approving
   // just credits the balance. Any other order is a plan bought directly with a
   // gift card code (see POST /billing/checkout) — approving it IS the payment
@@ -756,31 +798,19 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
 
   if (isCreditDeposit) {
     order.status = 'paid';
-    order.adminNote = req.body.adminNote || `Approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`;
+    order.adminNote = req.body?.adminNote || `Approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`;
 
     if (targetUser) {
       targetUser.credits = parseFloat((targetUser.credits + order.amount).toFixed(2));
 
       // Notify the customer through the site's mail system — this is the
       // "staff verified and approved" confirmation for manual payments
-      // (UPI/Bank/Gift Card). Actual server/VPS credentials, when a panel
-      // isn't auto-linked, are still sent by a staff member as a separate mail.
-      const approveMail: Mail = {
-        id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-        batchId: `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        senderId: req.user!.id,
-        senderName: approverName,
-        senderRole: req.user!.role,
-        recipientId: targetUser.id,
-        recipientName: targetUser.displayName || targetUser.username || targetUser.email,
-        recipientEmail: targetUser.email,
-        subject: 'Payment Approved — Credits Added',
-        body: `Good news! Your ${order.paymentMethod || 'manual'} payment of $${order.amount.toFixed(2)} has been verified and approved.\n\n$${order.amount.toFixed(2)} in account credits has been added to your balance and is ready to use on the Billing page.\n\nIf this order also included a server or VPS, our team will follow up here in Mail with your setup details and credentials shortly.`,
-        isRead: false,
-        isBroadcast: false,
-        createdAt: new Date().toISOString()
-      };
-      db.mail.unshift(approveMail);
+      // (UPI/Bank/Gift Card).
+      queueCustomerMail(
+        db, req.user!, targetUser,
+        'Payment Approved — Credits Added',
+        `Good news! Your ${order.paymentMethod || 'manual'} payment of $${order.amount.toFixed(2)} has been verified and approved.\n\n$${order.amount.toFixed(2)} in account credits has been added to your balance (new balance: $${targetUser.credits.toFixed(2)}) and is ready to use on the Billing page.\n\nOrder reference: #${order.id.slice(-8)}`
+      );
     }
 
     saveDbSync();
@@ -819,11 +849,20 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
   // makes that spend final. (Gift card orders never touched credits.)
   const paidWithCredits = !!order.creditsHeld;
   order.creditsHeld = false;
-  order.adminNote = req.body.adminNote || (paidWithCredits
+  order.adminNote = req.body?.adminNote || (paidWithCredits
     ? `Approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`
     : `Gift card verified and approved by ${req.user!.email} on ${new Date().toLocaleDateString()}`);
   targetUser.plan = plan.id;
   targetUser.updatedAt = new Date().toISOString();
+
+  // Tell the customer straight away — written in the same save as the status
+  // change, BEFORE provisioning, so an approved order can never end up with
+  // no notification even if setup hits a problem afterwards.
+  queueCustomerMail(
+    db, req.user!, targetUser,
+    'Payment Approved — Setting Up Your Server',
+    `Good news! Your ${order.paymentMethod || 'manual'} payment for '${plan.name}' ($${order.amount.toFixed(2)}) has been verified and approved.\n\nWe're setting up your service now. If it isn't created automatically, a staff member will send your login details and credentials right here in Mail shortly.\n\nOrder reference: #${order.id.slice(-8)}`
+  );
   saveDbSync();
 
   const provisionRecord = await createProvisionRecord(order, targetUser, plan, product);
@@ -834,23 +873,6 @@ router.post('/orders/:id/approve', async (req: AuthenticatedRequest, res: Respon
   // pages reflect progress once it updates the provisioning record.
   runProvisioning(provisionRecord.id).catch(() => { /* runProvisioning already handles its own errors */ });
 
-  const approveMail: Mail = {
-    id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-    batchId: `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    senderId: req.user!.id,
-    senderName: approverName,
-    senderRole: req.user!.role,
-    recipientId: targetUser.id,
-    recipientName: targetUser.displayName || targetUser.username || targetUser.email,
-    recipientEmail: targetUser.email,
-    subject: 'Payment Approved — Setting Up Your Server',
-    body: `Good news! Your ${order.paymentMethod || 'manual'} payment for '${plan.name}' has been verified and approved.\n\nWe're setting up your service now. If it isn't created automatically, a staff member will send your login details and credentials right here in Mail shortly.`,
-    isRead: false,
-    isBroadcast: false,
-    createdAt: new Date().toISOString()
-  };
-  db.mail.unshift(approveMail);
-  saveDbSync();
 
   await createAuditLog(req.user!.id, req.user!.email, req.user!.role, 'ADMIN_APPROVE_PAYMENT', order.id, `Approved ${paidWithCredits ? 'credits' : 'gift card'} order #${order.id} for plan '${plan.name}' — provisioning started for user ${order.userEmail}`);
 
@@ -899,25 +921,13 @@ router.post('/orders/:id/reject', async (req: AuthenticatedRequest, res: Respons
   }
 
   if (targetUser) {
-    const reviewerName = req.user!.displayName || req.user!.username || req.user!.email;
-    const rejectMail: Mail = {
-      id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      batchId: `mbatch_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      senderId: req.user!.id,
-      senderName: reviewerName,
-      senderRole: req.user!.role,
-      recipientId: targetUser.id,
-      recipientName: targetUser.displayName || targetUser.username || targetUser.email,
-      recipientEmail: targetUser.email,
-      subject: 'Payment Verification Failed',
-      body: isCreditDeposit
-        ? `We couldn't verify your ${order.paymentMethod || 'manual'} payment of $${order.amount.toFixed(2)}.\n\nReason: ${order.adminNote}\n\nPlease double-check the details and submit again from the Billing page, or contact support if you believe this is a mistake.`
-        : `We couldn't approve your order for '${order.planName}' ($${order.amount.toFixed(2)}, paid with ${order.paymentMethod || 'manual payment'}).\n\nReason: ${order.adminNote}\n\n${refunded > 0 ? `$${refunded.toFixed(2)} has been refunded to your account credits.\n\n` : ''}Please double-check the details and try checking out again, or contact support if you believe this is a mistake.`,
-      isRead: false,
-      isBroadcast: false,
-      createdAt: new Date().toISOString()
-    };
-    db.mail.unshift(rejectMail);
+    queueCustomerMail(
+      db, req.user!, targetUser,
+      'Payment Declined',
+      isCreditDeposit
+        ? `We couldn't verify your ${order.paymentMethod || 'manual'} payment of $${order.amount.toFixed(2)}, so it has been declined.\n\nReason: ${order.adminNote}\n\nPlease double-check the details and submit again from the Billing page, or contact support if you believe this is a mistake.\n\nOrder reference: #${order.id.slice(-8)}`
+        : `We couldn't approve your order for '${order.planName}' ($${order.amount.toFixed(2)}, paid with ${order.paymentMethod || 'manual payment'}), so it has been declined.\n\nReason: ${order.adminNote}\n\n${refunded > 0 ? `$${refunded.toFixed(2)} has been refunded to your account credits.\n\n` : ''}Please double-check the details and try checking out again, or contact support if you believe this is a mistake.\n\nOrder reference: #${order.id.slice(-8)}`
+    );
   }
 
   saveDbSync();

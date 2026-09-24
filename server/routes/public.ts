@@ -30,7 +30,10 @@ router.get('/products', async (req: Request, res: Response) => {
 // GET /api/v1/public/plans
 router.get('/plans', async (req: Request, res: Response) => {
   const db = await getDb();
-  let plans = db.plans.filter(p => p.isActive);
+  // A plan is only public when its category still exists AND is active. Without
+  // this, plans left behind by a deleted / hidden category kept showing up.
+  const liveProductIds = new Set(db.products.filter(prod => prod.isActive).map(prod => prod.id));
+  let plans = db.plans.filter(p => p.isActive && liveProductIds.has(p.productId));
   const category = req.query.category as string;
   if (category) {
     plans = plans.filter(p => {
