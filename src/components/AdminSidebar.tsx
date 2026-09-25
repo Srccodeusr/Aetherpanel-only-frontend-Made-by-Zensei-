@@ -2,7 +2,7 @@ import React from 'react';
 import {
   ShieldAlert, Users, Package, ShoppingBag,
   Tag, Megaphone, LifeBuoy, FileText, Sliders, ArrowLeft, LogOut,
-  Sparkles, MessageSquare, Scale, Key, Link2, Mail
+  Sparkles, MessageSquare, Scale, Key, Link2, Mail, Palette
 } from 'lucide-react';
 
 import { useAuth } from '../lib/AuthContext';
@@ -107,6 +107,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ currentPage, onNavig
           >
             <Sliders className="h-4 w-4 text-amber-400" />
             <span>Fonts & Themes</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('admin-page-designer')}
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${currentPage === 'admin-page-designer' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+          >
+            <Palette className="h-4 w-4 text-amber-400" />
+            <span>Page Designer</span>
           </button>
 
           <button

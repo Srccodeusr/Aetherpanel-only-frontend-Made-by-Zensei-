@@ -397,6 +397,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </button>
                         <button
                           type="button"
+                          onClick={() => handleNav('admin-page-designer')}
+                          className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-page-designer' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
+                        >
+                          <Palette className="h-4 w-4" /> Page Designer
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleNav('admin-support')}
                           className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-support' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
                         >
