@@ -921,6 +921,25 @@ export interface SystemSettings {
   heroDescription?: string;
   footerDescription?: string;
   panelIntegration?: PanelIntegrationSettings;
+  /** Page Designer overrides, keyed by page key (see src/lib/customPageRegistry.ts). */
+  customPages?: Record<string, CustomPageConfig>;
+}
+
+/**
+ * off     – built-in page is shown untouched
+ * css     – built-in page is kept, admin CSS is layered on top of it
+ * replace – built-in page is swapped for admin HTML + CSS (rendered in a sandboxed frame)
+ */
+export type CustomPageMode = 'off' | 'css' | 'replace';
+
+export interface CustomPageConfig {
+  mode: CustomPageMode;
+  html: string;
+  css: string;
+  /** Replace mode only: hide the navbar, sidebars and footer so the page is full-bleed. */
+  hideChrome?: boolean;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface AnimationSettings {
