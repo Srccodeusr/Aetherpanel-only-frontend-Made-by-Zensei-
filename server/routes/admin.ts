@@ -1362,6 +1362,79 @@ router.put('/settings/appearance', async (req: AuthenticatedRequest, res: Respon
   res.json({ success: true, message: 'Animation settings updated successfully.', data: db.settings.animationSettings });
 });
 
+// --- PAGE DESIGNER (per-page custom HTML/CSS overrides) ---
+const VALID_PAGE_MODES = ['off', 'css', 'replace'];
+
+// GET /api/v1/admin/custom-pages - full map of every page's override config
+router.get('/custom-pages', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  res.json({ success: true, data: db.settings.customPages || {} });
+});
+
+// GET /api/v1/admin/custom-pages/:pageKey - single page's override config
+router.get('/custom-pages/:pageKey', async (req: AuthenticatedRequest, res: Response) => {
+  const db = await getDb();
+  const config = (db.settings.customPages || {})[req.params.pageKey] || { mode: 'off', html: '', css: '' };
+  res.json({ success: true, data: config });
+});
+
+// PUT /api/v1/admin/custom-pages/:pageKey - save one page's HTML/CSS override
+router.put('/custom-pages/:pageKey', async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'super_admin') {
+    return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Admin permissions required' } });
+  }
+
+  const { pageKey } = req.params;
+  const { mode, html, css, hideChrome } = req.body || {};
+
+  if (!VALID_PAGE_MODES.includes(mode)) {
+    return res.status(400).json({ success: false, error: { code: 'INVALID_MODE', message: `mode must be one of: ${VALID_PAGE_MODES.join(', ')}` } });
+  }
+
+  const db = await getDb();
+  if (!db.settings.customPages) db.settings.customPages = {};
+
+  db.settings.customPages[pageKey] = {
+    mode,
+    html: typeof html === 'string' ? html : '',
+    css: typeof css === 'string' ? css : '',
+    hideChrome: !!hideChrome,
+    updatedAt: new Date().toISOString(),
+    updatedBy: req.user!.email
+  };
+  saveDbSync();
+
+  await createAuditLog(
+    req.user!.id, req.user!.email, req.user!.role,
+    'ADMIN_UPDATE_CUSTOM_PAGE', pageKey,
+    `Set page override for "${pageKey}" to mode "${mode}"`
+  );
+
+  res.json({ success: true, message: 'Page override saved successfully.', data: db.settings.customPages[pageKey] });
+});
+
+// DELETE /api/v1/admin/custom-pages/:pageKey - reset a page back to the stock look
+router.delete('/custom-pages/:pageKey', async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user!.role !== 'admin' && req.user!.role !== 'super_admin') {
+    return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Admin permissions required' } });
+  }
+
+  const { pageKey } = req.params;
+  const db = await getDb();
+  if (db.settings.customPages && db.settings.customPages[pageKey]) {
+    delete db.settings.customPages[pageKey];
+    saveDbSync();
+  }
+
+  await createAuditLog(
+    req.user!.id, req.user!.email, req.user!.role,
+    'ADMIN_RESET_CUSTOM_PAGE', pageKey,
+    `Reset page override for "${pageKey}" back to default`
+  );
+
+  res.json({ success: true, message: 'Page override reset to default.' });
+});
+
 // --- EXTERNAL PANEL INTEGRATION ("Link your panel") ---
 const MASKED_SECRET = '••••••••••••••••';
 

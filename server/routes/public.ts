@@ -116,6 +116,26 @@ router.get('/theme-settings', async (req: Request, res: Response) => {
   res.json({ success: true, data: themeSettings });
 });
 
+// GET /api/v1/public/custom-pages
+// Read-only, unauthenticated view of the Page Designer overrides so that
+// public pages (Home, Pricing, etc.) can apply admin-authored HTML/CSS
+// without needing an admin session. Only the fields a page needs to render
+// are exposed — updatedAt/updatedBy (audit metadata) are stripped.
+router.get('/custom-pages', async (req: Request, res: Response) => {
+  const db = await getDb();
+  const customPages = db.settings.customPages || {};
+  const publicView: Record<string, { mode: string; html: string; css: string; hideChrome?: boolean }> = {};
+  for (const [pageKey, config] of Object.entries(customPages)) {
+    publicView[pageKey] = {
+      mode: config.mode,
+      html: config.html || '',
+      css: config.css || '',
+      hideChrome: !!config.hideChrome
+    };
+  }
+  res.json({ success: true, data: publicView });
+});
+
 // GET /api/v1/public/legal
 router.get('/legal', async (req: Request, res: Response) => {
   const db = await getDb();
