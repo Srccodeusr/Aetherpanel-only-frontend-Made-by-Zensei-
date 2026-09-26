@@ -94,7 +94,7 @@ router.post('/tickets/:id/reply', authMiddleware, async (req: AuthenticatedReque
   const newMsg = {
     id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     senderId: req.user!.id,
-    senderName: isAdmin ? 'Aether Technical Support' : (req.user!.displayName || req.user!.username || req.user!.email.split('@')[0]),
+    senderName: isAdmin ? 'MonoNode Technical Support' : (req.user!.displayName || req.user!.username || req.user!.email.split('@')[0]),
     senderRole: req.user!.role,
     message: message.trim(),
     createdAt: new Date().toISOString()

@@ -763,7 +763,7 @@ router.get('/discord/callback', async (req, res) => {
                 (function() {
                   var targetOrigin = ${JSON.stringify(targetOrigin)};
                   if (window.opener) {
-                    var payload = { type: 'AETHERPANEL_DISCORD_OAUTH_ERROR', success: false, error: ${JSON.stringify(errMsg)} };
+                    var payload = { type: 'MONONODE_DISCORD_OAUTH_ERROR', success: false, error: ${JSON.stringify(errMsg)} };
                     try { window.opener.postMessage(payload, targetOrigin); } catch (e) {}
                     try { window.opener.postMessage({ ...payload, type: 'DISCORD_AUTH_ERROR' }, targetOrigin); } catch (e) {}
                     setTimeout(function() { try { window.close(); } catch(e){} }, 1500);
@@ -837,7 +837,7 @@ router.get('/discord/callback', async (req, res) => {
                 (function() {
                   var targetOrigin = ${JSON.stringify(targetOrigin)};
                   if (window.opener) {
-                    var payload = { type: 'AETHERPANEL_DISCORD_OAUTH_ERROR', success: false, error: ${JSON.stringify(errMsg)} };
+                    var payload = { type: 'MONONODE_DISCORD_OAUTH_ERROR', success: false, error: ${JSON.stringify(errMsg)} };
                     try { window.opener.postMessage(payload, targetOrigin); } catch (e) {}
                     try { window.opener.postMessage({ ...payload, type: 'DISCORD_AUTH_ERROR' }, targetOrigin); } catch (e) {}
                     setTimeout(function() { try { window.close(); } catch(e){} }, 2000);
@@ -940,7 +940,7 @@ router.get('/discord/callback', async (req, res) => {
                   var discordAccount = ${JSON.stringify(discordAccountData)};
                   if (window.opener) {
                     var payload = {
-                      type: 'AETHERPANEL_DISCORD_OAUTH_SUCCESS',
+                      type: 'MONONODE_DISCORD_OAUTH_SUCCESS',
                       success: true,
                       token: token,
                       user: userData,
@@ -950,7 +950,7 @@ router.get('/discord/callback', async (req, res) => {
                     try { window.opener.postMessage({ ...payload, type: 'DISCORD_AUTH_SUCCESS' }, targetOrigin); } catch (e) {}
                     setTimeout(function() { try { window.close(); } catch(e){} }, 200);
                   } else {
-                    document.body.innerHTML = '<div style="text-align:center;padding:30px;"><h2>Discord authorization successful</h2><p>You can close this window and return to AetherPanel.</p></div>';
+                    document.body.innerHTML = '<div style="text-align:center;padding:30px;"><h2>Discord authorization successful</h2><p>You can close this window and return to MonoNode.</p></div>';
                   }
                 })();
               </script>
@@ -1042,7 +1042,7 @@ router.get('/discord/callback', async (req, res) => {
                 var discordAccount = ${JSON.stringify(newDiscordAccount)};
                 if (window.opener) {
                   var payload = {
-                    type: 'AETHERPANEL_DISCORD_OAUTH_SUCCESS',
+                    type: 'MONONODE_DISCORD_OAUTH_SUCCESS',
                     success: true,
                     token: token,
                     user: userData,
@@ -1052,7 +1052,7 @@ router.get('/discord/callback', async (req, res) => {
                   try { window.opener.postMessage({ ...payload, type: 'DISCORD_AUTH_SUCCESS' }, targetOrigin); } catch (e) {}
                   setTimeout(function() { try { window.close(); } catch(e){} }, 200);
                 } else {
-                  document.body.innerHTML = '<div style="text-align:center;padding:30px;"><h2>Discord authorization successful</h2><p>You can close this window and return to AetherPanel.</p></div>';
+                  document.body.innerHTML = '<div style="text-align:center;padding:30px;"><h2>Discord authorization successful</h2><p>You can close this window and return to MonoNode.</p></div>';
                 }
               })();
             </script>

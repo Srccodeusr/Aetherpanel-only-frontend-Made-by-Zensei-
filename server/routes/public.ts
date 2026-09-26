@@ -38,7 +38,7 @@ router.get('/plans', async (req: Request, res: Response) => {
   if (category) {
     plans = plans.filter(p => {
       const prod = db.products.find(prod => prod.id === p.productId);
-      const planCat = prod?.category || (p.id.includes('bot') ? 'bot' : 'minecraft');
+      const planCat = prod?.category || (p.id.includes('bot') ? 'bot' : 'vps');
       return planCat.toLowerCase() === category.toLowerCase();
     });
   }
@@ -60,8 +60,8 @@ router.get('/settings', async (req: Request, res: Response) => {
     pageAnimationsEnabled, socialLinks, heroDescription, footerDescription
   } = db.settings;
 
-  const DEFAULT_HERO = 'Deploy high-performance Minecraft servers and 24/7 Discord bots in minutes. Premium infrastructure, transparent pricing, and real support when you need it.';
-  const DEFAULT_FOOTER = 'Premium Minecraft & Discord Bot hosting plans built on high-performance infrastructure.';
+  const DEFAULT_HERO = 'Deploy 24/7 Discord bots and high-performance VPS instances in minutes. Reliable infrastructure, transparent pricing, and real support when you need it.';
+  const DEFAULT_FOOTER = 'Bot Hosting & VPS Hosting plans built on the same reliable, high-performance network.';
 
   res.json({
     success: true,
@@ -114,26 +114,6 @@ router.get('/theme-settings', async (req: Request, res: Response) => {
     assets: { ...defaults.assets, ...(db.settings.themeSettings?.assets || {}) }
   };
   res.json({ success: true, data: themeSettings });
-});
-
-// GET /api/v1/public/custom-pages
-// Read-only, unauthenticated view of the Page Designer overrides so that
-// public pages (Home, Pricing, etc.) can apply admin-authored HTML/CSS
-// without needing an admin session. Only the fields a page needs to render
-// are exposed — updatedAt/updatedBy (audit metadata) are stripped.
-router.get('/custom-pages', async (req: Request, res: Response) => {
-  const db = await getDb();
-  const customPages = db.settings.customPages || {};
-  const publicView: Record<string, { mode: string; html: string; css: string; hideChrome?: boolean }> = {};
-  for (const [pageKey, config] of Object.entries(customPages)) {
-    publicView[pageKey] = {
-      mode: config.mode,
-      html: config.html || '',
-      css: config.css || '',
-      hideChrome: !!config.hideChrome
-    };
-  }
-  res.json({ success: true, data: publicView });
 });
 
 // GET /api/v1/public/legal
