@@ -115,16 +115,3 @@ export function getInstallationInfo(): InstallationInfo {
 export function getInstallationId(): string {
   return getInstallationInfo().installationId;
 }
-
-/**
- * Returns the installation public metadata (safe for frontend/API, excluding secrets)
- */
-export function getInstallationPublicMetadata() {
-  const info = getInstallationInfo();
-  return {
-    installationId: info.installationId,
-    installedAt: info.installedAt,
-    version: info.version,
-    systemName: info.systemName
-  };
-}

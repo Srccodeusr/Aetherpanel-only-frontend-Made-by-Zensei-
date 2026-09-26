@@ -484,18 +484,6 @@ export function saveDbSync(): void {
   }, 150);
 }
 
-export function saveDbImmediate(): void {
-  if (!dbCache) return;
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DB_FILE, JSON.stringify(dbCache, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('[Database/ERROR] Failed to persist database to disk:', err);
-  }
-}
-
 // Async alias kept for route modules that await the save call
 export async function saveDb(): Promise<void> {
   saveDbSync();

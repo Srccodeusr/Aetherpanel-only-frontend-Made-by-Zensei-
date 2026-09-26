@@ -1,51 +1,8 @@
 import crypto from 'crypto';
 import http from 'http';
 import https from 'https';
-import { getDb, saveDbSync } from './db';
+import { saveDbSync } from './db';
 import { WebhookSubscription } from '../src/types';
-
-export interface WebhookEventPayload {
-  event: string;
-  timestamp: string;
-  data: Record<string, any>;
-}
-
-/**
- * Dispatch an event to all matching, enabled webhooks
- */
-export async function dispatchWebhookEvent(
-  event: string,
-  data: Record<string, any>,
-  targetUserId?: string
-): Promise<void> {
-  try {
-    const db = await getDb();
-    if (!db.webhooks || db.webhooks.length === 0) return;
-
-    const payload: WebhookEventPayload = {
-      event,
-      timestamp: new Date().toISOString(),
-      data
-    };
-
-    const payloadString = JSON.stringify(payload);
-
-    // Filter webhooks listening to this event or '*' (wildcard)
-    const matchingWebhooks = db.webhooks.filter(wh => {
-      if (!wh.isEnabled) return false;
-      if (targetUserId && wh.userId !== targetUserId && wh.userId !== 'usr_admin') return false;
-      return wh.events.includes('*') || wh.events.includes(event);
-    });
-
-    for (const wh of matchingWebhooks) {
-      deliverWebhook(wh, payloadString, event).catch(err => {
-        console.warn(`[Webhooks] Delivery failed for hook '${wh.name}' (${wh.id}):`, err.message);
-      });
-    }
-  } catch (err: any) {
-    console.error('[Webhooks] Dispatch error:', err);
-  }
-}
 
 /**
  * Deliver a webhook with HMAC SHA-256 signature

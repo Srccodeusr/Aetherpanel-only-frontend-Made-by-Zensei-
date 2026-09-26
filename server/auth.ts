@@ -242,8 +242,6 @@ export function requireApiKeyScope(requiredScope: string) {
   };
 }
 
-export const requireApiScope = requireApiKeyScope;
-
 export const requireAdmin = requireRole(['admin', 'super_admin']);
 
 export async function createAuditLog(
