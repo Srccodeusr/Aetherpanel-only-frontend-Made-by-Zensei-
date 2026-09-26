@@ -1,5 +1,91 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   MonoNode design tokens
+   ----------------------------------------------------------------------------
+   Tailwind v4 generates every colour utility (bg-amber-500, text-violet-400,
+   border-cyan-500/30 ...) from the --color-* theme variables below. Remapping
+   the accent families to the MonoNode orange ramp restyles the ENTIRE app
+   (customer panel, admin panel, auth, billing) without touching each page.
+   Semantic colours (emerald = success, rose = danger) are left untouched.
+   ========================================================================== */
+@theme {
+  /* Typography */
+  --font-sans: "Archivo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Neutral base: near-black, very slightly warm (matches the reference) */
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #c9c9cf;
+  --color-zinc-400: #9a9aa3;
+  --color-zinc-500: #6b6b74;
+  --color-zinc-600: #4a4a52;
+  --color-zinc-700: #2e2e33;
+  --color-zinc-800: #1d1d21;
+  --color-zinc-900: #131316;
+  --color-zinc-950: #0a0a0b;
+
+  /* MonoNode orange ramp */
+  --color-mono-50: #fff4ec;
+  --color-mono-100: #ffe6d3;
+  --color-mono-200: #ffcaa5;
+  --color-mono-300: #ffa66d;
+  --color-mono-400: #ff8a3d;
+  --color-mono-500: #ff6a1a;
+  --color-mono-600: #ee5208;
+  --color-mono-700: #c53f07;
+  --color-mono-800: #9c330d;
+  --color-mono-900: #7d2d0e;
+  --color-mono-950: #431405;
+
+  /* Remap the legacy accent families onto the orange ramp */
+  --color-amber-50: var(--color-mono-50);
+  --color-amber-100: var(--color-mono-100);
+  --color-amber-200: var(--color-mono-200);
+  --color-amber-300: var(--color-mono-300);
+  --color-amber-400: var(--color-mono-400);
+  --color-amber-500: var(--color-mono-500);
+  --color-amber-600: var(--color-mono-600);
+  --color-amber-700: var(--color-mono-700);
+  --color-amber-800: var(--color-mono-800);
+  --color-amber-900: var(--color-mono-900);
+  --color-amber-950: var(--color-mono-950);
+
+  --color-violet-50: var(--color-mono-50);
+  --color-violet-100: var(--color-mono-100);
+  --color-violet-200: var(--color-mono-200);
+  --color-violet-300: var(--color-mono-300);
+  --color-violet-400: var(--color-mono-400);
+  --color-violet-500: var(--color-mono-500);
+  --color-violet-600: var(--color-mono-600);
+  --color-violet-700: var(--color-mono-700);
+  --color-violet-800: var(--color-mono-800);
+  --color-violet-900: var(--color-mono-900);
+  --color-violet-950: var(--color-mono-950);
+
+  --color-cyan-50: var(--color-mono-50);
+  --color-cyan-100: var(--color-mono-100);
+  --color-cyan-200: var(--color-mono-200);
+  --color-cyan-300: var(--color-mono-300);
+  --color-cyan-400: var(--color-mono-400);
+  --color-cyan-500: var(--color-mono-500);
+  --color-cyan-600: var(--color-mono-600);
+  --color-cyan-700: var(--color-mono-700);
+  --color-cyan-800: var(--color-mono-800);
+  --color-cyan-900: var(--color-mono-900);
+  --color-cyan-950: var(--color-mono-950);
+
+  --color-yellow-400: var(--color-mono-400);
+  --color-yellow-500: var(--color-mono-500);
+  --color-yellow-600: var(--color-mono-600);
+  --color-orange-400: var(--color-mono-400);
+  --color-orange-500: var(--color-mono-500);
+  --color-orange-600: var(--color-mono-600);
+}
+
 @layer base {
   .custom-cursor-active, .custom-cursor-active * {
     cursor: none !important;
@@ -12,6 +98,17 @@
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
+    background-color: #0a0a0b;
+    color: #e4e4e7;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Heavy grotesk headlines with tight tracking, as in the reference design */
+  h1, h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.035em;
   }
 
   /* Support for modern dynamic viewport height */
@@ -40,6 +137,89 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   MonoNode shared components (used by Home / Pricing / product pages)
+   --------------------------------------------------------------------------- */
+@layer components {
+  /* Small mono uppercase label, e.g. "STARTS AT" */
+  .mono-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-zinc-500);
+  }
+
+  /* Orange glowing primary CTA (the "Deploy" button) */
+  .btn-mono {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 0.5rem;
+    background: var(--color-mono-500);
+    color: #0a0a0b;
+    font-weight: 700;
+    font-size: 0.8rem;
+    box-shadow: 0 6px 24px -6px rgba(255, 106, 26, 0.65);
+    transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-mono:hover {
+    background: var(--color-mono-400);
+    box-shadow: 0 8px 30px -6px rgba(255, 106, 26, 0.85);
+  }
+  .btn-mono:active {
+    transform: scale(0.98);
+  }
+
+  /* Ghost secondary CTA (the "View Plans" button) */
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #f4f4f5;
+    font-weight: 600;
+    font-size: 0.8rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+
+  /* Bordered dark card with a subtle orange hover, as used across the reference */
+  .mono-card {
+    border-radius: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.02);
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  }
+  .mono-card:hover {
+    border-color: rgba(255, 106, 26, 0.35);
+    background: rgba(255, 106, 26, 0.03);
+  }
+
+  /* Faint engineering grid backdrop */
+  .mono-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  /* Hero image fades into the page on the left, like the reference */
+  .hero-fade {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.55) 38%, #000 78%);
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.55) 38%, #000 78%);
+  }
+}
+
 /* Custom sleek dark scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -47,7 +227,7 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(9, 9, 11, 0.6);
+  background: rgba(10, 10, 11, 0.6);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -56,6 +236,5 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(113, 113, 122, 0.9);
+  background: rgba(255, 106, 26, 0.6);
 }
-

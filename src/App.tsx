@@ -4,8 +4,6 @@ import { ThemeProvider } from './lib/ThemeContext';
 import { BrandingProvider, useBranding } from './lib/BrandingContext';
 import { ToastProvider } from './lib/ToastContext';
 import { AnimationProvider, useAnimation } from './lib/AnimationContext';
-import { CustomPageProvider, useCustomPages } from './lib/CustomPageContext';
-import { CustomPageOverlay } from './components/CustomPageOverlay';
 import { PageTransition } from './components/animation/PageTransition';
 import { motion } from 'motion/react';
 import { ShieldAlert, RefreshCw, LogOut } from 'lucide-react';
@@ -22,7 +20,7 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 
 // Public Pages
 import { Home } from './pages/public/Home';
-import { MinecraftHosting } from './pages/public/MinecraftHosting';
+import { VpsHosting } from './pages/public/VpsHosting';
 import { BotHosting } from './pages/public/BotHosting';
 import { Pricing } from './pages/public/Pricing';
 import { Status } from './pages/public/Status';
@@ -59,14 +57,12 @@ import { AdminAppearance } from './pages/admin/AdminAppearance';
 import { AdminDiscord } from './pages/admin/AdminDiscord';
 import { AdminLegal } from './pages/admin/AdminLegal';
 import { PanelLinkSettings } from './pages/admin/PanelLinkSettings';
-import { AdminPageDesigner } from './pages/admin/AdminPageDesigner';
 
 
 function AppContent() {
   const { user, loading, logout } = useAuth();
   const { brandName, maintenanceMode, maintenanceMessage, refreshBranding } = useBranding();
   const { settings, getTransitionProps, motionEnabled } = useAnimation();
-  const { getPageConfig } = useCustomPages();
 
   const [checkingMaintenance, setCheckingMaintenance] = useState(false);
   const [isInitialPanelMount, setIsInitialPanelMount] = useState(true);
@@ -132,7 +128,7 @@ function AppContent() {
   useEffect(() => {
     if (loading) return;
 
-    const publicPages = ['home', 'minecraft', 'bot', 'pricing', 'status', 'docs', 'terms', 'privacy', 'acceptable-use', 'legal', 'login', 'register'];
+    const publicPages = ['home', 'bot', 'vps', 'pricing', 'status', 'docs', 'terms', 'privacy', 'acceptable-use', 'legal', 'login', 'register'];
     const isPublic = publicPages.includes(currentPage);
     const isAdmin = currentPage.startsWith('admin-');
 
@@ -167,14 +163,9 @@ function AppContent() {
     );
   }
 
-  const isPublicPage = ['home', 'minecraft', 'bot', 'pricing', 'status', 'docs', 'terms', 'privacy', 'acceptable-use', 'legal', 'login', 'register'].includes(currentPage);
+  const isPublicPage = ['home', 'bot', 'vps', 'pricing', 'status', 'docs', 'terms', 'privacy', 'acceptable-use', 'legal', 'login', 'register'].includes(currentPage);
   const isAdminPage = currentPage.startsWith('admin-');
   const isCustomerPage = !isPublicPage && !isAdminPage;
-
-  // Page Designer: a "replace" override can optionally hide the navbar,
-  // sidebars and footer so the admin's own HTML is full-bleed.
-  const pageConfig = getPageConfig(currentPage);
-  const hideChrome = pageConfig?.mode === 'replace' && !!pageConfig.hideChrome;
 
   if (maintenanceMode && user?.role !== 'admin' && user?.role !== 'super_admin') {
     if (isCustomerPage) {
@@ -249,19 +240,17 @@ function AppContent() {
       />
 
       {/* Top Header Navbar */}
-      {!hideChrome && (
-        <Navbar
-          currentPage={currentPage}
-          onNavigate={handleNavigate}
-          onOpenSearch={() => setIsSearchOpen(true)}
-        />
-      )}
+      <Navbar
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        onOpenSearch={() => setIsSearchOpen(true)}
+      />
 
       {/* Main Body Layout */}
       <div className="flex-1 flex flex-col lg:flex-row">
 
         {/* Customer Sidebar */}
-        {!hideChrome && isCustomerPage && user && (
+        {isCustomerPage && user && (
           <motion.div
             initial={motionEnabled && settings.initialPanelAnimation && isInitialPanelMount ? { opacity: 0, x: -20 } : { opacity: 1, x: 0 }}
             animate={{ opacity: 1, x: 0 }}
@@ -276,7 +265,7 @@ function AppContent() {
         )}
 
         {/* Admin Sidebar */}
-        {!hideChrome && isAdminPage && user && (
+        {isAdminPage && user && (
           <motion.div
             initial={motionEnabled && settings.initialPanelAnimation && isInitialPanelMount ? { opacity: 0, x: -20 } : { opacity: 1, x: 0 }}
             animate={{ opacity: 1, x: 0 }}
@@ -294,63 +283,60 @@ function AppContent() {
         <main className="flex-1 overflow-x-hidden min-h-[calc(100vh-4rem)] flex flex-col justify-between p-4 lg:p-6">
           <div className="flex-1 flex flex-col">
             <PageTransition routeKey={currentPage}>
-              <CustomPageOverlay pageKey={currentPage} config={pageConfig}>
-                <div className="flex-1 flex flex-col">
-                  {/* Public Views */}
-                  {currentPage === 'home' && <Home onNavigate={handleNavigate} />}
-                  {currentPage === 'minecraft' && <MinecraftHosting onNavigate={handleNavigate} />}
-                  {currentPage === 'bot' && <BotHosting onNavigate={handleNavigate} />}
-                  {currentPage === 'pricing' && <Pricing onNavigate={handleNavigate} />}
-                  {currentPage === 'status' && <Status />}
-                  {currentPage === 'docs' && <Docs />}
-                  {currentPage === 'terms' && <LegalPage initialSlug="terms" onNavigate={handleNavigate} />}
-                  {currentPage === 'privacy' && <LegalPage initialSlug="privacy" onNavigate={handleNavigate} />}
-                  {currentPage === 'acceptable-use' && <LegalPage initialSlug="acceptable-use" onNavigate={handleNavigate} />}
-                  {currentPage === 'legal' && <LegalPage initialSlug={pageParams?.initialSlug || 'terms'} onNavigate={handleNavigate} />}
+              <div className="flex-1 flex flex-col">
+                {/* Public Views */}
+                {currentPage === 'home' && <Home onNavigate={handleNavigate} />}
+                {currentPage === 'bot' && <BotHosting onNavigate={handleNavigate} />}
+                {currentPage === 'vps' && <VpsHosting onNavigate={handleNavigate} />}
+                {currentPage === 'pricing' && <Pricing onNavigate={handleNavigate} />}
+                {currentPage === 'status' && <Status />}
+                {currentPage === 'docs' && <Docs />}
+                {currentPage === 'terms' && <LegalPage initialSlug="terms" onNavigate={handleNavigate} />}
+                {currentPage === 'privacy' && <LegalPage initialSlug="privacy" onNavigate={handleNavigate} />}
+                {currentPage === 'acceptable-use' && <LegalPage initialSlug="acceptable-use" onNavigate={handleNavigate} />}
+                {currentPage === 'legal' && <LegalPage initialSlug={pageParams?.initialSlug || 'terms'} onNavigate={handleNavigate} />}
 
-                  {/* Auth Views */}
-                  {currentPage === 'login' && <Login onNavigate={handleNavigate} />}
-                  {currentPage === 'register' && <Register onNavigate={handleNavigate} />}
+                {/* Auth Views */}
+                {currentPage === 'login' && <Login onNavigate={handleNavigate} />}
+                {currentPage === 'register' && <Register onNavigate={handleNavigate} />}
 
-                  {/* Customer Account Views */}
-                  {currentPage === 'dashboard' && (
-                    <div className="space-y-6">
-                      <AdBanner placement="dashboard" />
-                      <Dashboard onNavigate={handleNavigate} />
-                    </div>
-                  )}
-                  {currentPage === 'billing' && <Billing onNavigate={handleNavigate} />}
-                  {currentPage === 'checkout' && <Checkout onNavigate={handleNavigate} params={pageParams} />}
-                  {currentPage === 'support' && <SupportTickets onNavigate={handleNavigate} />}
-                  {currentPage === 'mail' && <Mail onNavigate={handleNavigate} />}
-                  {currentPage === 'activity' && <ActivityLog />}
-                  {currentPage === 'settings' && <UserSettings />}
+                {/* Customer Account Views */}
+                {currentPage === 'dashboard' && (
+                  <div className="space-y-6">
+                    <AdBanner placement="dashboard" />
+                    <Dashboard onNavigate={handleNavigate} />
+                  </div>
+                )}
+                {currentPage === 'billing' && <Billing onNavigate={handleNavigate} />}
+                {currentPage === 'checkout' && <Checkout onNavigate={handleNavigate} params={pageParams} />}
+                {currentPage === 'support' && <SupportTickets onNavigate={handleNavigate} />}
+                {currentPage === 'mail' && <Mail onNavigate={handleNavigate} />}
+                {currentPage === 'activity' && <ActivityLog />}
+                {currentPage === 'settings' && <UserSettings />}
 
-                  {/* Admin Views */}
-                  {currentPage === 'admin-dashboard' && <AdminDashboard onNavigate={handleNavigate} />}
-                  {currentPage === 'admin-users' && <AdminUsers />}
-                  {currentPage === 'admin-products' && <AdminProducts />}
-                  {currentPage === 'admin-billing' && <AdminBilling />}
-                  {currentPage === 'admin-coupons' && <AdminCoupons />}
-                  {currentPage === 'admin-announcements' && <AdminAnnouncements />}
-                  {currentPage === 'admin-support' && <AdminSupport />}
-                  {currentPage === 'admin-mail' && <AdminMail />}
-                  {currentPage === 'admin-audit-logs' && <AdminAuditLogs />}
-                  {currentPage === 'admin-api-keys' && <AdminApiKeys onNavigate={handleNavigate} />}
-                  {currentPage === 'admin-legal' && <AdminLegal />}
-                  {currentPage === 'admin-settings' && <AdminSettings />}
-                  {currentPage === 'admin-ads' && <AdminAds />}
-                  {currentPage === 'admin-discord' && <AdminDiscord />}
-                  {currentPage === 'admin-appearance' && <AdminAppearance />}
-                  {currentPage === 'admin-panel-link' && <PanelLinkSettings />}
-                  {currentPage === 'admin-page-designer' && <AdminPageDesigner />}
-                </div>
-              </CustomPageOverlay>
+                {/* Admin Views */}
+                {currentPage === 'admin-dashboard' && <AdminDashboard onNavigate={handleNavigate} />}
+                {currentPage === 'admin-users' && <AdminUsers />}
+                {currentPage === 'admin-products' && <AdminProducts />}
+                {currentPage === 'admin-billing' && <AdminBilling />}
+                {currentPage === 'admin-coupons' && <AdminCoupons />}
+                {currentPage === 'admin-announcements' && <AdminAnnouncements />}
+                {currentPage === 'admin-support' && <AdminSupport />}
+                {currentPage === 'admin-mail' && <AdminMail />}
+                {currentPage === 'admin-audit-logs' && <AdminAuditLogs />}
+                {currentPage === 'admin-api-keys' && <AdminApiKeys onNavigate={handleNavigate} />}
+                {currentPage === 'admin-legal' && <AdminLegal />}
+                {currentPage === 'admin-settings' && <AdminSettings />}
+                {currentPage === 'admin-ads' && <AdminAds />}
+                {currentPage === 'admin-discord' && <AdminDiscord />}
+                {currentPage === 'admin-appearance' && <AdminAppearance />}
+                {currentPage === 'admin-panel-link' && <PanelLinkSettings />}
+              </div>
             </PageTransition>
           </div>
 
           {/* Subtle Panel Footer for Customer & Admin Pages */}
-          {!hideChrome && !isPublicPage && (
+          {!isPublicPage && (
             <footer className="py-3 px-6 border-t border-zinc-900/80 bg-zinc-950/60 text-[11px] text-zinc-500 flex items-center justify-between font-mono shrink-0 mt-8">
               <span className="font-medium text-zinc-400">© 2025–2026 {brandName || 'Platform'}</span>
               <span className="text-[10px] text-zinc-600 hidden sm:inline">Account & Billing Portal</span>
@@ -360,7 +346,7 @@ function AppContent() {
       </div>
 
       {/* Footer for Public Views */}
-      {!hideChrome && isPublicPage && <Footer onNavigate={handleNavigate} />}
+      {isPublicPage && <Footer onNavigate={handleNavigate} />}
 
     </div>
   );
@@ -373,9 +359,7 @@ export default function App() {
         <AuthProvider>
           <ToastProvider>
             <AnimationProvider>
-              <CustomPageProvider>
-                <AppContent />
-              </CustomPageProvider>
+              <AppContent />
             </AnimationProvider>
           </ToastProvider>
         </AuthProvider>

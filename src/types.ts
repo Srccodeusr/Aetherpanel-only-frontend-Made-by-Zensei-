@@ -1,5 +1,5 @@
 /**
- * AetherPanel - Global Type Definitions
+ * MonoNode - Global Type Definitions
  */
 
 export type UserRole = 'user' | 'support' | 'moderator' | 'admin' | 'super_admin';
@@ -153,7 +153,7 @@ export interface ServerType {
   id: string;
   name: string;
   slug: string;
-  category: 'Minecraft' | 'Bot Hosting' | 'Other' | string;
+  category: 'Bot Hosting' | 'VPS' | 'Other' | string;
   runtime: 'Java' | 'Node.js' | 'Bun' | 'Python' | string;
   description: string;
   icon: string;
@@ -171,9 +171,9 @@ export interface ServerTemplate {
   id: string;
   name: string;
   description: string;
-  category: 'minecraft' | 'bot' | 'other';
+  category: 'vps' | 'bot' | 'other';
   icon: string;
-  runtime: 'minecraft' | 'python' | 'nodejs';
+  runtime: 'linux' | 'python' | 'nodejs';
   versions: string[];
   defaultVersion: string;
   startupCommand: string;
@@ -233,7 +233,7 @@ export interface ServerStartupConfig {
   lastStoppedAt?: string;
   pid?: number;
 
-  // Minecraft Runtime
+  // JVM Runtime (legacy Java-based workloads)
   javaVersion?: string | number;
   jvmFlags?: string;
   xmsMB?: number;
@@ -921,25 +921,6 @@ export interface SystemSettings {
   heroDescription?: string;
   footerDescription?: string;
   panelIntegration?: PanelIntegrationSettings;
-  /** Page Designer overrides, keyed by page key (see src/lib/customPageRegistry.ts). */
-  customPages?: Record<string, CustomPageConfig>;
-}
-
-/**
- * off     – built-in page is shown untouched
- * css     – built-in page is kept, admin CSS is layered on top of it
- * replace – built-in page is swapped for admin HTML + CSS (rendered in a sandboxed frame)
- */
-export type CustomPageMode = 'off' | 'css' | 'replace';
-
-export interface CustomPageConfig {
-  mode: CustomPageMode;
-  html: string;
-  css: string;
-  /** Replace mode only: hide the navbar, sidebars and footer so the page is full-bleed. */
-  hideChrome?: boolean;
-  updatedAt?: string;
-  updatedBy?: string;
 }
 
 export interface AnimationSettings {
@@ -1285,7 +1266,7 @@ export interface WebhookSubscription {
   createdAt: string;
 }
 
-export type MarketplaceCategory = 'minecraft' | 'bot' | 'template' | 'tool' | 'utility';
+export type MarketplaceCategory = 'vps' | 'bot' | 'template' | 'tool' | 'utility';
 export type MarketplaceInstallType = 'template_deploy' | 'resource_install' | 'one_click_setup';
 export type MarketplaceBadge = 'official' | 'verified' | 'community';
 export type MarketplaceStatus = 'active' | 'pending' | 'draft' | 'rejected' | 'archived';
@@ -1309,12 +1290,12 @@ export interface MarketplaceItem {
   category: MarketplaceCategory;
   icon: string; // lucide icon name or image URL
   bannerUrl?: string;
-  author: string; // e.g. "AetherPanel Team" or user name
+  author: string; // e.g. "MonoNode Team" or user name
   authorId?: string; // userId if submitted by user
   badge: MarketplaceBadge; // 'official' | 'verified' | 'community'
   version: string;
   changelog?: string;
-  compatibility: string; // e.g. "Minecraft 1.20.x, Paper/Purpur", "Node 18+", "Python 3.10+", "All Nodes"
+  compatibility: string; // e.g. "Ubuntu 22.04, Debian 12", "Node 18+", "Python 3.10+", "All Nodes"
   requirements: {
     minRamMB: number;
     minCpuCores: number;
