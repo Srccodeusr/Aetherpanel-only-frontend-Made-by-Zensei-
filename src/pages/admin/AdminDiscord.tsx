@@ -706,7 +706,7 @@ export const AdminDiscord: React.FC = () => {
                     <th className="py-3 px-3">Timestamp</th>
                     <th className="py-3 px-3">Command / Event</th>
                     <th className="py-3 px-3">Discord User</th>
-                    <th className="py-3 px-3">Aether Account</th>
+                    <th className="py-3 px-3">MonoNode Account</th>
                     <th className="py-3 px-3">Result</th>
                     <th className="py-3 px-3">Details</th>
                   </tr>

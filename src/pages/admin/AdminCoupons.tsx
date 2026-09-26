@@ -207,7 +207,7 @@ export const AdminCoupons: React.FC = () => {
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="e.g. AETHER2026"
+                placeholder="e.g. MONO2026"
                 className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white uppercase font-mono focus:outline-none focus:border-amber-500"
                 required
               />

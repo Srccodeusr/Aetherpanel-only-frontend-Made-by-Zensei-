@@ -12,7 +12,7 @@ export const AdminProducts: React.FC = () => {
   // Plan Edit/Create Modal
   const [showModal, setShowModal] = useState(false);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
-  const [productId, setProductId] = useState<string>('prod_minecraft');
+  const [productId, setProductId] = useState<string>('prod_bot');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [ramMB, setRamMB] = useState(4096);
@@ -42,7 +42,7 @@ export const AdminProducts: React.FC = () => {
   const [categoryName, setCategoryName] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
-  const [categoryIcon, setCategoryIcon] = useState('Gamepad2');
+  const [categoryIcon, setCategoryIcon] = useState('Server');
   const [categoryTag, setCategoryTag] = useState('other');
   const [categoryIsActive, setCategoryIsActive] = useState(true);
   const [savingCategory, setSavingCategory] = useState(false);
@@ -205,7 +205,7 @@ export const AdminProducts: React.FC = () => {
     setCategoryName('');
     setCategorySlug('');
     setCategoryDescription('');
-    setCategoryIcon('Gamepad2');
+    setCategoryIcon('Server');
     setCategoryTag('other');
     setCategoryIsActive(true);
     setShowCategoryModal(true);
@@ -216,7 +216,7 @@ export const AdminProducts: React.FC = () => {
     setCategoryName(prod.name);
     setCategorySlug(prod.slug || '');
     setCategoryDescription(prod.description || '');
-    setCategoryIcon(prod.icon || 'Gamepad2');
+    setCategoryIcon(prod.icon || 'Server');
     setCategoryTag(prod.category || 'other');
     setCategoryIsActive(prod.isActive !== false);
     setShowCategoryModal(true);
@@ -234,7 +234,7 @@ export const AdminProducts: React.FC = () => {
       name: categoryName.trim(),
       slug: categorySlug.trim() || categoryName.trim(),
       description: categoryDescription.trim(),
-      icon: categoryIcon.trim() || 'Gamepad2',
+      icon: categoryIcon.trim() || 'Server',
       category: categoryTag.trim() || 'other',
       isActive: categoryIsActive
     };
@@ -450,7 +450,7 @@ export const AdminProducts: React.FC = () => {
           </button>
         </div>
         <p className="text-[11px] text-zinc-500 -mt-2">
-          Categories group plans (e.g. Discord Bot, Minecraft) — create as many as you need, rename them, or delete the defaults. Deleting a category also deletes its plans.
+          Categories group plans (e.g. Bot Hosting, VPS Hosting) — create as many as you need, rename them, or delete the defaults. Deleting a category also deletes its plans.
         </p>
 
         {loading ? (
@@ -1055,7 +1055,7 @@ export const AdminProducts: React.FC = () => {
                   type="text"
                   value={categoryIcon}
                   onChange={(e) => setCategoryIcon(e.target.value)}
-                  placeholder="e.g. Gamepad2, Bot, Server"
+                  placeholder="e.g. Bot, Server, Cpu"
                   className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
                 />
               </div>
@@ -1065,7 +1065,7 @@ export const AdminProducts: React.FC = () => {
                   type="text"
                   value={categoryTag}
                   onChange={(e) => setCategoryTag(e.target.value)}
-                  placeholder="e.g. bot, minecraft, vps"
+                  placeholder="e.g. bot, vps"
                   className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-xs text-white font-mono"
                 />
               </div>

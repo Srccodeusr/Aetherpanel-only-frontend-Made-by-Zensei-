@@ -202,7 +202,7 @@ export const AdminAppearance: React.FC = () => {
             <h1 className="text-xl font-bold text-white tracking-tight">Themes, Fonts & Visual Assets</h1>
           </div>
           <p className="text-xs text-zinc-400 mt-1">
-            Customize the global look and feel of AetherPanel. Set primary color palettes, typography, custom logos, and wallpaper animations.
+            Customize the global look and feel of MonoNode. Set primary color palettes, typography, custom logos, and wallpaper animations.
           </p>
         </div>
 

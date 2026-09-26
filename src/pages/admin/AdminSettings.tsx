@@ -20,12 +20,12 @@ export const AdminSettings: React.FC = () => {
   } = useBranding();
   const [activeTab, setActiveTab] = useState<'general' | 'auth' | 'security' | 'payments' | 'pending'>('general');
 
-  const DEFAULT_HERO_DESCRIPTION = 'High-performance Minecraft servers and 24/7 Discord bot hosting, backed by real support. Powered by AMD Ryzen 9 7950X compute hardware and enterprise NVMe storage.';
-  const DEFAULT_FOOTER_DESCRIPTION = 'Premium Minecraft & Discord Bot hosting plans built on high-clock AMD Ryzen 9 hardware and NVMe enterprise storage.';
+  const DEFAULT_HERO_DESCRIPTION = '24/7 Discord bot hosting and high-performance VPS instances, backed by real support. Powered by high-clock compute hardware and enterprise NVMe storage.';
+  const DEFAULT_FOOTER_DESCRIPTION = 'Bot Hosting & VPS Hosting plans built on the same reliable, high-performance network.';
 
-  const [brandName, setBrandName] = useState('AetherPanel');
-  const [brandTagline, setBrandTagline] = useState('Premium Minecraft & Discord Bot Hosting');
-  const [supportEmail, setSupportEmail] = useState('support@aetherpanel.com');
+  const [brandName, setBrandName] = useState('MonoNode');
+  const [brandTagline, setBrandTagline] = useState('Bot Hosting & VPS Hosting');
+  const [supportEmail, setSupportEmail] = useState('support@mononode.com');
   const [currencySymbol, setCurrencySymbol] = useState('$');
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -40,9 +40,9 @@ export const AdminSettings: React.FC = () => {
 
   // Social Links Settings
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
-    discord: 'https://discord.gg/aetherpanel',
-    twitter: 'https://twitter.com/aetherpanel',
-    github: 'https://github.com/aetherpanel'
+    discord: 'https://discord.gg/mononode',
+    twitter: 'https://twitter.com/mononode',
+    github: 'https://github.com/mononode'
   });
   const [savingSocialLinks, setSavingSocialLinks] = useState(false);
   const [socialLinksSuccess, setSocialLinksSuccess] = useState<string | null>(null);
@@ -98,8 +98,8 @@ export const AdminSettings: React.FC = () => {
   const [gateways, setGateways] = useState<PaymentGatewaySettings>({
     upi: {
       enabled: true,
-      upiId: 'aetherpay@upi',
-      merchantName: 'AetherPanel Hosting',
+      upiId: 'mononodepay@upi',
+      merchantName: 'MonoNode Hosting',
       qrCodeUrl: 'https://images.unsplash.com/photo-1628155930542-3c7a64e2c833?auto=format&fit=crop&w=400&q=80',
       instructions: 'Scan the QR code or send payment to the UPI ID. Enter the 12-digit UTR or Transaction Ref ID after payment.'
     },
@@ -108,7 +108,7 @@ export const AdminSettings: React.FC = () => {
       bankName: 'HDFC Bank / Global Web Bank',
       accountNumber: '918237192837',
       ifsc: 'HDFC0001234',
-      accountHolder: 'Aether Cloud Infrastructure LLC',
+      accountHolder: 'MonoNode Cloud Infrastructure LLC',
       instructions: 'Transfer to Bank Account and submit your NEFT/IMPS/Wire Reference Number.'
     },
     crypto: {
@@ -149,9 +149,9 @@ export const AdminSettings: React.FC = () => {
   const fetchSettings = async () => {
     const res = await apiRequest('/admin/settings');
     if (res.success && res.data) {
-      setBrandName(res.data.brandName || 'AetherPanel');
+      setBrandName(res.data.brandName || 'MonoNode');
       setBrandTagline(res.data.brandTagline || '');
-      setSupportEmail(res.data.supportEmail || 'support@aetherpanel.com');
+      setSupportEmail(res.data.supportEmail || 'support@mononode.com');
       setCurrencySymbol(res.data.currencySymbol || '$');
       setRegistrationEnabled(res.data.registrationEnabled ?? true);
       setMaintenanceMode(res.data.maintenanceMode ?? false);
@@ -905,7 +905,7 @@ export const AdminSettings: React.FC = () => {
                           firebaseProjectId: e.target.value
                         }
                       }))}
-                      placeholder="my-aetherpanel-app"
+                      placeholder="my-mononode-app"
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white font-mono placeholder-zinc-600 focus:outline-none focus:border-amber-500"
                     />
                   </div>
@@ -1319,7 +1319,7 @@ export const AdminSettings: React.FC = () => {
                     type="text"
                     value={gateways.upi.merchantName}
                     onChange={(e) => setGateways({ ...gateways, upi: { ...gateways.upi, merchantName: e.target.value } })}
-                    placeholder="AetherPanel Hosting"
+                    placeholder="MonoNode Hosting"
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white"
                   />
                 </div>

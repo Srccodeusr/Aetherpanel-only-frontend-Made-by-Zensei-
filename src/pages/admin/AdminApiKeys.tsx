@@ -811,7 +811,7 @@ export const AdminApiKeys: React.FC<AdminApiKeysProps> = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. AetherPanel Manager Bot, Billing Integration, CI/CD Script"
+                  placeholder="e.g. MonoNode Manager Bot, Billing Integration, CI/CD Script"
                   value={newKeyName}
                   onChange={e => setNewKeyName(e.target.value)}
                   className="w-full rounded-xl bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-500"
