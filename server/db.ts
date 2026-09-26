@@ -44,22 +44,22 @@ export interface DatabaseSchema {
 
 const defaultProducts: Product[] = [
   {
-    id: 'prod_minecraft',
-    slug: 'minecraft',
-    name: 'Minecraft Hosting',
-    description: 'High-performance Minecraft server hosting powered by high clock-speed AMD Ryzen CPU nodes and NVMe SSDs.',
-    category: 'minecraft',
-    icon: 'Gamepad2',
+    id: 'prod_bot',
+    slug: 'bot',
+    name: 'Bot Hosting',
+    description: '24/7 persistent process hosting for Discord, Telegram, and WhatsApp bots supporting Node.js, Python, and Bun.',
+    category: 'bot',
+    icon: 'Bot',
     isActive: true,
     sortOrder: 1
   },
   {
-    id: 'prod_bot',
-    slug: 'bot',
-    name: 'Discord Bot Hosting',
-    description: '24/7 persistent process hosting for Discord, Telegram, and Twitch bots supporting Node.js, Python, and Bun.',
-    category: 'bot',
-    icon: 'Bot',
+    id: 'prod_vps',
+    slug: 'vps',
+    name: 'VPS Hosting',
+    description: 'Full root-access virtual private servers on high-clock compute hardware with NVMe storage and DDoS protection.',
+    category: 'vps',
+    icon: 'Server',
     isActive: true,
     sortOrder: 2
   }
@@ -67,48 +67,8 @@ const defaultProducts: Product[] = [
 
 const defaultPlans: Plan[] = [
   {
-    id: 'plan_mc_free', productId: 'prod_minecraft', name: 'Free Tier',
-    description: 'Free plan for testing, small survival worlds, and plugins.',
-    priceMonthly: 0, priceYearly: 0, ramMB: 1024, cpuCores: 1, diskGB: 10,
-    backupLimit: 1, databaseLimit: 1, serverLimit: 1, networkMbps: 1000,
-    features: ['1GB DDR5 RAM', '1 vCPU Ryzen 9', '10GB NVMe Storage', 'Subdomain Included', 'Free Forever'],
-    locations: ['local'], isActive: true
-  },
-  {
-    id: 'plan_mc_starter', productId: 'prod_minecraft', name: 'Starter Tier',
-    description: 'Ideal for small friend groups & vanilla survival worlds.',
-    priceMonthly: 19, priceYearly: 190, ramMB: 2048, cpuCores: 1.5, diskGB: 20,
-    backupLimit: 2, databaseLimit: 1, serverLimit: 1, networkMbps: 1000,
-    features: ['2GB DDR5 RAM', '1.5 vCPU Ryzen 9', '20GB NVMe Storage', 'Subdomain Included', '2 Backups'],
-    locations: ['local'], isActive: true
-  },
-  {
-    id: 'plan_mc_basic', productId: 'prod_minecraft', name: 'Basic Tier',
-    description: 'Great for small community servers & light plugin setups.',
-    priceMonthly: 39, priceYearly: 390, ramMB: 3072, cpuCores: 2, diskGB: 30,
-    backupLimit: 3, databaseLimit: 2, serverLimit: 2, networkMbps: 1000,
-    features: ['3GB DDR5 RAM', '2 vCPU Ryzen 9', '30GB NVMe Storage', 'Custom Subdomain', '3 Backups', '2 MySQL DBs'],
-    locations: ['local'], isActive: true
-  },
-  {
-    id: 'plan_mc_pro', productId: 'prod_minecraft', name: 'Pro Tier',
-    description: 'Recommended for heavily modded servers, Paper, and Purpur networks.',
-    priceMonthly: 69, priceYearly: 690, ramMB: 4096, cpuCores: 3, diskGB: 50,
-    backupLimit: 5, databaseLimit: 3, serverLimit: 3, networkMbps: 2500,
-    features: ['4GB DDR5 RAM', '3 vCPU Ryzen 9', '50GB NVMe Storage', 'DDoS Protection', '5 Backups', '3 MySQL DBs'],
-    locations: ['local'], isPopular: true, isActive: true
-  },
-  {
-    id: 'plan_mc_advanced', productId: 'prod_minecraft', name: 'Advanced Network',
-    description: 'Maximum performance for large networks and Forge/Fabric modpacks.',
-    priceMonthly: 99, priceYearly: 990, ramMB: 6144, cpuCores: 4, diskGB: 75,
-    backupLimit: 10, databaseLimit: 5, serverLimit: 5, networkMbps: 10000,
-    features: ['6GB DDR5 RAM', '4 vCPU Ryzen 9', '75GB NVMe Storage', '10 Backups', '5 MySQL DBs', 'VIP Support'],
-    locations: ['local'], isActive: true
-  },
-  {
     id: 'plan_bot_free', productId: 'prod_bot', name: 'Free Bot Tier',
-    description: 'Free 24/7 process hosting for Discord, Telegram, and Twitch bots.',
+    description: 'Free 24/7 process hosting for Discord, Telegram, and WhatsApp bots.',
     priceMonthly: 0, priceYearly: 0, ramMB: 512, cpuCores: 0.5, diskGB: 5,
     backupLimit: 1, databaseLimit: 1, serverLimit: 1, networkMbps: 1000,
     features: ['512MB RAM', '0.5 vCPU', '5GB Storage', 'Node.js & Python 3', '24/7 Process Manager'],
@@ -145,28 +105,68 @@ const defaultPlans: Plan[] = [
     backupLimit: 5, databaseLimit: 3, serverLimit: 5, networkMbps: 2500,
     features: ['6GB RAM', '3 vCPU', '60GB Storage', 'Node.js, Python, Bun', '5 Backups', '3 Databases', 'Priority Support'],
     locations: ['local'], isActive: true
+  },
+  {
+    id: 'plan_vps_free', productId: 'prod_vps', name: 'Free Tier',
+    description: 'Free plan for testing small apps, sites, and side projects.',
+    priceMonthly: 0, priceYearly: 0, ramMB: 1024, cpuCores: 1, diskGB: 10,
+    backupLimit: 1, databaseLimit: 1, serverLimit: 1, networkMbps: 1000,
+    features: ['1GB RAM', '1 vCPU Core', '10GB NVMe Storage', 'Free Subdomain', 'Free Forever'],
+    locations: ['local'], isActive: true
+  },
+  {
+    id: 'plan_vps_starter', productId: 'prod_vps', name: 'Starter Tier',
+    description: 'Ideal for small websites, bots, and lightweight apps.',
+    priceMonthly: 19, priceYearly: 190, ramMB: 2048, cpuCores: 1.5, diskGB: 20,
+    backupLimit: 2, databaseLimit: 1, serverLimit: 1, networkMbps: 1000,
+    features: ['2GB RAM', '1.5 vCPU Cores', '20GB NVMe Storage', 'Full Root Access', '2 Backups'],
+    locations: ['local'], isActive: true
+  },
+  {
+    id: 'plan_vps_basic', productId: 'prod_vps', name: 'Basic Tier',
+    description: 'Great for small production apps and databases.',
+    priceMonthly: 39, priceYearly: 390, ramMB: 3072, cpuCores: 2, diskGB: 30,
+    backupLimit: 3, databaseLimit: 2, serverLimit: 2, networkMbps: 1000,
+    features: ['3GB RAM', '2 vCPU Cores', '30GB NVMe Storage', 'Full Root Access', '3 Backups', '2 Databases'],
+    locations: ['local'], isActive: true
+  },
+  {
+    id: 'plan_vps_pro', productId: 'prod_vps', name: 'Pro Tier',
+    description: 'Recommended for production workloads and multi-service stacks.',
+    priceMonthly: 69, priceYearly: 690, ramMB: 4096, cpuCores: 3, diskGB: 50,
+    backupLimit: 5, databaseLimit: 3, serverLimit: 3, networkMbps: 2500,
+    features: ['4GB RAM', '3 vCPU Cores', '50GB NVMe Storage', 'DDoS Protection', '5 Backups', '3 Databases'],
+    locations: ['local'], isPopular: true, isActive: true
+  },
+  {
+    id: 'plan_vps_advanced', productId: 'prod_vps', name: 'Advanced Tier',
+    description: 'Maximum performance for high-traffic apps and services.',
+    priceMonthly: 99, priceYearly: 990, ramMB: 6144, cpuCores: 4, diskGB: 75,
+    backupLimit: 10, databaseLimit: 5, serverLimit: 5, networkMbps: 10000,
+    features: ['6GB RAM', '4 vCPU Cores', '75GB NVMe Storage', '10 Backups', '5 Databases', 'VIP Support'],
+    locations: ['local'], isActive: true
   }
 ];
 
 const defaultSettings: SystemSettings = {
-  platformName: 'AetherPanel',
-  brandName: 'AetherPanel',
-  brandTagline: 'Next-Generation Cloud Platform for Minecraft & Bot Infrastructure',
-  supportEmail: 'support@aetherpanel.com',
-  discordUrl: 'https://discord.gg/aetherpanel',
+  platformName: 'MonoNode',
+  brandName: 'MonoNode',
+  brandTagline: 'Bot Hosting & VPS Hosting on Reliable Infrastructure',
+  supportEmail: 'support@mononode.com',
+  discordUrl: 'https://discord.gg/mononode',
   currencySymbol: '$',
   currencyCode: 'USD',
   registrationEnabled: true,
   emailVerificationRequired: false,
   maintenanceMode: false,
-  maintenanceMessage: 'AetherPanel is currently performing scheduled system upgrades. We will be back online shortly.',
+  maintenanceMessage: 'MonoNode is currently performing scheduled system upgrades. We will be back online shortly.',
   defaultTheme: 'dark',
-  accentColor: '#8b5cf6',
+  accentColor: '#ff6a1a',
   paymentGateways: {
     upi: {
       enabled: true,
-      upiId: 'aetherpay@upi',
-      merchantName: 'AetherPanel Hosting',
+      upiId: 'mononodepay@upi',
+      merchantName: 'MonoNode Hosting',
       qrCodeUrl: '',
       instructions: 'Scan the QR code or send payment to the UPI ID. Enter the 12-digit UTR or Transaction Ref ID after payment.'
     },
@@ -391,7 +391,7 @@ export async function getDb(reload = false): Promise<DatabaseSchema> {
         // Backfill defaults for fields that may be missing from an older/imported DB.
         // Categories and plans are only seeded when the field is MISSING — an
         // empty list means the admin deleted them on purpose, and re-seeding on
-        // every restart would bring a deleted category (e.g. Minecraft) back.
+        // every restart would bring a deleted category (e.g. VPS) back.
         if (!Array.isArray(dbCache.products)) dbCache.products = cloneDefaults(defaultProducts);
         if (!Array.isArray(dbCache.plans)) dbCache.plans = cloneDefaults(defaultPlans);
         // Any collection the routes call .unshift()/.filter() on must exist,

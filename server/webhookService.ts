@@ -75,10 +75,10 @@ export async function deliverWebhook(
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payloadString),
-          'User-Agent': 'AetherPanel-Webhook-Delivery/1.0',
-          'X-Aether-Event': event,
-          'X-Aether-Signature-256': `sha256=${signature}`,
-          'X-Aether-Delivery': `del_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+          'User-Agent': 'MonoNode-Webhook-Delivery/1.0',
+          'X-MonoNode-Event': event,
+          'X-MonoNode-Signature-256': `sha256=${signature}`,
+          'X-MonoNode-Delivery': `del_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
         },
         timeout: 10000 // 10s timeout
       };

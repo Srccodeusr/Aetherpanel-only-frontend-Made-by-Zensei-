@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { getDb, saveDbSync } from './db';
 import { User, UserRole, AuditLog } from '../src/types';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'aetherpanel_secret_jwt_key_2026_super_safe';
+export const JWT_SECRET = process.env.JWT_SECRET || 'mononode_secret_jwt_key_2026_super_safe';
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
@@ -161,7 +161,7 @@ export async function authMiddleware(req: AuthenticatedRequest, res: Response, n
         success: false,
         error: {
           code: 'PLATFORM_MAINTENANCE',
-          message: db.settings.maintenanceMessage || 'AetherPanel is currently undergoing scheduled maintenance. Please try again later.'
+          message: db.settings.maintenanceMessage || 'MonoNode is currently undergoing scheduled maintenance. Please try again later.'
         }
       });
     }

@@ -29,7 +29,7 @@ function isLocalHost(host: string): boolean {
 }
 
 /**
- * Resolves the canonical public base URL for the current AetherPanel installation.
+ * Resolves the canonical public base URL for the current MonoNode installation.
  * Priority:
  *   1. Explicit trusted configured installation URL (env: APP_URL, PANEL_URL, AETHER_PUBLIC_URL, PUBLIC_URL, or DB settings)
  *   2. Incoming trusted request origin (via reverse proxy headers X-Forwarded-Proto / X-Forwarded-Host or Host)
@@ -116,7 +116,7 @@ export function getCurrentInstallationPublicUrl(
 }
 
 /**
- * Authoritative Discord OAuth2 Redirect URI resolver for the current AetherPanel installation.
+ * Authoritative Discord OAuth2 Redirect URI resolver for the current MonoNode installation.
  * Concept:
  *   getCurrentInstallationPublicUrl()
  *          ↓

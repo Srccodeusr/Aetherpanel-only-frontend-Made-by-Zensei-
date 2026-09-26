@@ -58,7 +58,7 @@ export function getInstallationInfo(): InstallationInfo {
             installationSecret: envSecret || parsed.installationSecret || generateInstallationSecret(),
             installedAt: parsed.installedAt || new Date().toISOString(),
             version: parsed.version || '2.6.0',
-            systemName: parsed.systemName || 'AetherPanel Local VPS'
+            systemName: parsed.systemName || 'MonoNode Local VPS'
           };
           return cachedInstallation;
         }
@@ -74,7 +74,7 @@ export function getInstallationInfo(): InstallationInfo {
     installationSecret: envSecret || generateInstallationSecret(),
     installedAt: new Date().toISOString(),
     version: '2.6.0',
-    systemName: 'AetherPanel Control Plane'
+    systemName: 'MonoNode Control Plane'
   };
 
   // 4. Persist to filesystem
