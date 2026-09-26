@@ -223,7 +223,7 @@ export const Register: React.FC<RegisterProps> = ({ onNavigate }) => {
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="minecraft_owner"
+                    placeholder="mono_user"
                     className="w-full rounded-xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
                   />
                 </div>
