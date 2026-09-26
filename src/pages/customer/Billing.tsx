@@ -150,7 +150,7 @@ export const Billing: React.FC<BillingProps> = ({ onNavigate }) => {
             <span className="flex items-center gap-1.5 font-semibold text-white">
               <Tag className="h-4 w-4 text-violet-400" /> Redeem Promo / Voucher Code
             </span>
-            <span className="text-[11px] text-violet-400 font-mono">e.g. AETHER2025</span>
+            <span className="text-[11px] text-violet-400 font-mono">e.g. MONO2025</span>
           </div>
 
           <form onSubmit={handleRedeemCoupon} className="flex gap-2">

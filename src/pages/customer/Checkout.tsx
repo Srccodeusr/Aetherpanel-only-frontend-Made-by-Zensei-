@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, ShieldCheck, Loader2, CheckCircle2, AlertTriangle, Tag,
-  Server, Copy, ExternalLink, DollarSign, Clock, Gamepad2, Bot as BotIcon, Rocket, Gift, Mail as MailIcon
+  Server, Copy, ExternalLink, DollarSign, Clock, Bot as BotIcon, Rocket, Gift, Mail as MailIcon
 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 import { useAuth } from '../../lib/AuthContext';
@@ -427,7 +427,7 @@ export const Checkout: React.FC<CheckoutProps> = ({ onNavigate, params }) => {
         <div className="flex items-start justify-between gap-4 border-b border-zinc-800 pb-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-              {product?.category === 'bot' ? <BotIcon className="h-5 w-5 text-cyan-400" /> : <Gamepad2 className="h-5 w-5 text-violet-400" />}
+              {product?.category === 'bot' ? <BotIcon className="h-5 w-5 text-amber-400" /> : <Server className="h-5 w-5 text-amber-400" />}
             </div>
             <div>
               <h1 className="text-lg font-bold text-white">{plan.name}</h1>

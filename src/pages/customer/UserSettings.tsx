@@ -176,7 +176,7 @@ export const UserSettings: React.FC = () => {
           const handleMsg = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
             const type = event.data?.type;
-            if (type === 'AETHERPANEL_DISCORD_OAUTH_SUCCESS' || type === 'DISCORD_AUTH_SUCCESS') {
+            if (type === 'MONONODE_DISCORD_OAUTH_SUCCESS' || type === 'DISCORD_AUTH_SUCCESS') {
               clearInterval(checkTimer);
               window.removeEventListener('message', handleMsg);
               if (event.data?.token) {
@@ -189,7 +189,7 @@ export const UserSettings: React.FC = () => {
               refreshUser();
               setDiscordNotice('✅ Discord account authorized and linked successfully!');
               setConnectingDiscord(false);
-            } else if (type === 'AETHERPANEL_DISCORD_OAUTH_ERROR' || type === 'DISCORD_AUTH_ERROR') {
+            } else if (type === 'MONONODE_DISCORD_OAUTH_ERROR' || type === 'DISCORD_AUTH_ERROR') {
               clearInterval(checkTimer);
               window.removeEventListener('message', handleMsg);
               setDiscordNotice(`Authorization Cancelled or Failed: ${event.data?.error || 'User declined access'}`);
@@ -199,7 +199,7 @@ export const UserSettings: React.FC = () => {
           window.addEventListener('message', handleMsg);
           return;
         } else {
-          setDiscordNotice('OAuth Popup window was blocked by browser settings. Please allow popups for AetherPanel.');
+          setDiscordNotice('OAuth Popup window was blocked by browser settings. Please allow popups for MonoNode.');
         }
       } else {
         setDiscordNotice('Not Configured: Configure Discord OAuth in Platform Settings.');
@@ -341,7 +341,7 @@ export const UserSettings: React.FC = () => {
             <Shield className="h-5 w-5 text-amber-500/80 shrink-0 mt-0.5" />
             <div className="text-xs text-zinc-400 leading-relaxed">
               <div className="font-semibold text-white">System theme settings are authoritative</div>
-              Platform-wide styling is locked by system administrators to maintain AetherPanel's consistent luxury identity. Personal customization controls are currently disabled.
+              Platform-wide styling is locked by system administrators to maintain MonoNode's consistent visual identity. Personal customization controls are currently disabled.
             </div>
           </div>
         ) : (
@@ -389,7 +389,7 @@ export const UserSettings: React.FC = () => {
                   ))}
                 </select>
                 <p className="text-[10px] text-zinc-500 leading-relaxed">
-                  Applies high-legibility displaying and body typeface styling globally across AetherPanel modules.
+                  Applies high-legibility displaying and body typeface styling globally across MonoNode modules.
                 </p>
               </div>
             </div>
