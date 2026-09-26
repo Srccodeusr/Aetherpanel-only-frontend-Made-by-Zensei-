@@ -116,12 +116,6 @@
     --app-height: 100dvh;
   }
 
-  /* Smooth momentum scrolling for iOS/touch */
-  .touch-scroll {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-
   /* Safe area padding utilities */
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
@@ -134,89 +128,6 @@
   }
   .pr-safe {
     padding-right: max(1rem, env(safe-area-inset-right));
-  }
-}
-
-/* ---------------------------------------------------------------------------
-   MonoNode shared components (used by Home / Pricing / product pages)
-   --------------------------------------------------------------------------- */
-@layer components {
-  /* Small mono uppercase label, e.g. "STARTS AT" */
-  .mono-eyebrow {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--color-zinc-500);
-  }
-
-  /* Orange glowing primary CTA (the "Deploy" button) */
-  .btn-mono {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.7rem 1.4rem;
-    border-radius: 0.5rem;
-    background: var(--color-mono-500);
-    color: #0a0a0b;
-    font-weight: 700;
-    font-size: 0.8rem;
-    box-shadow: 0 6px 24px -6px rgba(255, 106, 26, 0.65);
-    transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-  }
-  .btn-mono:hover {
-    background: var(--color-mono-400);
-    box-shadow: 0 8px 30px -6px rgba(255, 106, 26, 0.85);
-  }
-  .btn-mono:active {
-    transform: scale(0.98);
-  }
-
-  /* Ghost secondary CTA (the "View Plans" button) */
-  .btn-ghost {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.7rem 1.4rem;
-    border-radius: 0.5rem;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    color: #f4f4f5;
-    font-weight: 600;
-    font-size: 0.8rem;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-  }
-  .btn-ghost:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.18);
-  }
-
-  /* Bordered dark card with a subtle orange hover, as used across the reference */
-  .mono-card {
-    border-radius: 0.9rem;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.02);
-    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
-  }
-  .mono-card:hover {
-    border-color: rgba(255, 106, 26, 0.35);
-    background: rgba(255, 106, 26, 0.03);
-  }
-
-  /* Faint engineering grid backdrop */
-  .mono-grid {
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-    background-size: 56px 56px;
-  }
-
-  /* Hero image fades into the page on the left, like the reference */
-  .hero-fade {
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.55) 38%, #000 78%);
-    mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.55) 38%, #000 78%);
   }
 }
 
