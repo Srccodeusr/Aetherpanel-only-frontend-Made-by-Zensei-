@@ -45,13 +45,3 @@ export function peekEphemeralSecret(key: string): string | null {
   return entry.value;
 }
 
-/** Reads the secret and immediately deletes it — use for true one-time reveals. */
-export function consumeEphemeralSecret(key: string): string | null {
-  const value = peekEphemeralSecret(key);
-  if (value !== null) store.delete(key);
-  return value;
-}
-
-export function clearEphemeralSecret(key: string): void {
-  store.delete(key);
-}
