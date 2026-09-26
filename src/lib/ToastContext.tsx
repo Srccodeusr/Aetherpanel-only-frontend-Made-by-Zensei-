@@ -25,24 +25,6 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
-// Standalone global emitter for usage outside React components if needed
-type ToastListener = (toast: ToastItem) => void;
-const standaloneListeners = new Set<ToastListener>();
-
-export const triggerGlobalToast = (type: ToastType, message: string, title?: string, duration?: number): string => {
-  const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const item: ToastItem = { id, type, message, title, duration: duration ?? 4000 };
-  standaloneListeners.forEach(fn => fn(item));
-  return id;
-};
-
-export const globalToast = {
-  success: (message: string, title?: string, duration?: number) => triggerGlobalToast('success', message, title, duration),
-  error: (message: string, title?: string, duration?: number) => triggerGlobalToast('error', message, title, duration),
-  warning: (message: string, title?: string, duration?: number) => triggerGlobalToast('warning', message, title, duration),
-  info: (message: string, title?: string, duration?: number) => triggerGlobalToast('info', message, title, duration)
-};
-
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -68,26 +50,6 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     return id;
-  }, [dismissToast]);
-
-  React.useEffect(() => {
-    const handleStandalone: ToastListener = (item) => {
-      setToasts(prev => {
-        const existing = prev.find(t => t.type === item.type && t.message === item.message);
-        if (existing) return prev;
-        return [...prev.slice(-4), item];
-      });
-      if (item.duration && item.duration > 0) {
-        setTimeout(() => {
-          dismissToast(item.id);
-        }, item.duration);
-      }
-    };
-
-    standaloneListeners.add(handleStandalone);
-    return () => {
-      standaloneListeners.delete(handleStandalone);
-    };
   }, [dismissToast]);
 
   const toastMethods = React.useMemo(() => ({
