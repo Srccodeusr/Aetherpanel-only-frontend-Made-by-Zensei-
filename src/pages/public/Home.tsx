@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Gamepad2, Bot, Cpu, Zap, ShieldCheck, HardDrive, Terminal,
+  Bot, Cpu, Zap, ShieldCheck, HardDrive, Terminal,
   Globe2, ArrowRight, CheckCircle2, Sparkles, Server, Clock, Users, Flame,
   Sliders, Gauge, Layers
 } from 'lucide-react';
@@ -45,11 +45,11 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
     loadPlans();
   }, []);
 
-  const mcPlans = plans.filter(p => p.productId === 'prod_minecraft' || p.id.startsWith('plan_mc_'));
+  const vpsPlans = plans.filter(p => p.productId === 'prod_vps' || p.id.startsWith('plan_vps_'));
   const botPlans = plans.filter(p => p.productId === 'prod_bot' || p.id.startsWith('plan_bot_'));
 
-  const minMcPrice = mcPlans.length > 0
-    ? Math.min(...mcPlans.map(p => p.priceMonthly))
+  const minVpsPrice = vpsPlans.length > 0
+    ? Math.min(...vpsPlans.map(p => p.priceMonthly))
     : 1.49;
 
   const minBotPrice = botPlans.length > 0
@@ -258,7 +258,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                   </div>
                   <h3 className="text-base font-semibold text-white">Fast Setup</h3>
                   <p className="text-xs text-zinc-400 leading-relaxed">
-                    Pick a plan, complete checkout, and our team gets your Minecraft server or bot process online quickly.
+                    Pick a plan, complete checkout, and our team gets your bot or VPS online quickly.
                   </p>
                 </div>
               </div>
@@ -318,48 +318,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
-          
-          {/* Minecraft Card */}
-          <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-6 sm:p-8 space-y-6 hover:border-violet-500/40 hover:shadow-xl hover:shadow-violet-500/5 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-400 group-hover:scale-105 transition-transform">
-                  <Gamepad2 className="h-6 w-6 sm:h-7 sm:w-7" />
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Starts at ${minMcPrice.toFixed(2)}/mo
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-xl sm:text-2xl font-bold text-white">Minecraft Hosting</h3>
-                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                  Full support for Paper, Purpur, Spigot, Forge, Fabric, and Velocity networks, with performance tuning handled by our team.
-                </p>
-              </div>
-
-              <ul className="space-y-2.5 text-xs text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> High Single-Core Ryzen 9 7950X (5.7GHz)</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> Any Version Supported (1.8 to 1.20+)</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> Free MySQL/Postgres Database & Subdomain</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-violet-400 shrink-0" /> Routine Backups & Uptime Monitoring</li>
-              </ul>
-            </div>
-
-            <button
-              onClick={() => onNavigate('minecraft')}
-              className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800/90 text-white hover:bg-violet-600 transition-colors flex items-center justify-center gap-2 mt-4"
-            >
-              <span>Explore Minecraft Plans</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
 
           {/* Bot Hosting Card */}
-          <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-6 sm:p-8 space-y-6 hover:border-cyan-500/40 hover:shadow-xl hover:shadow-cyan-500/5 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+          <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-6 sm:p-8 space-y-6 hover:border-amber-500/40 hover:shadow-xl hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 group-hover:scale-105 transition-transform">
+                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-105 transition-transform">
                   <Bot className="h-6 w-6 sm:h-7 sm:w-7" />
                 </div>
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -368,25 +332,61 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl sm:text-2xl font-bold text-white">Discord Bot Hosting</h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-white">Bot Hosting</h3>
                 <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                  Persistent 24/7 background process manager for Discord, Telegram, and Twitch bots. Supporting Node.js (v18-v22), Python (3.9-3.12), Bun, and Go runtimes with auto-restart on crash.
+                  Persistent 24/7 background process manager for Discord, Telegram, and WhatsApp bots. Supporting Node.js (v18-v22), Python (3.9-3.12), Bun, and Go runtimes with auto-restart on crash.
                 </p>
               </div>
 
               <ul className="space-y-2.5 text-xs text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> 24/7 PM2-style Process Watchdog</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> Environment Variables & Secrets Manager</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> Setup & Configuration Support Included</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-cyan-400 shrink-0" /> Low Latency Connection to Discord Gateways</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> 24/7 PM2-style Process Watchdog</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> Environment Variables & Secrets Manager</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> Setup & Configuration Support Included</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> Low Latency Connection to Bot Gateways</li>
               </ul>
             </div>
 
             <button
               onClick={() => onNavigate('bot')}
-              className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800/90 text-white hover:bg-cyan-600 transition-colors flex items-center justify-center gap-2 mt-4"
+              className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800/90 text-white hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 mt-4"
             >
-              <span>Explore Discord Bot Plans</span>
+              <span>Explore Bot Hosting Plans</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* VPS Hosting Card */}
+          <div className="rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-6 sm:p-8 space-y-6 hover:border-amber-500/40 hover:shadow-xl hover:shadow-amber-500/5 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:scale-105 transition-transform">
+                  <Server className="h-6 w-6 sm:h-7 sm:w-7" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Starts at ${minVpsPrice.toFixed(2)}/mo
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-white">VPS Hosting</h3>
+                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                  Full root-access virtual private servers for sites, apps, and services, with performance tuning handled by our team.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 text-xs text-zinc-300">
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> High-Clock Dedicated vCPU Cores</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> Full Root Access, Any OS Image</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> Free MySQL/Postgres Database & Subdomain</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-amber-400 shrink-0" /> Routine Backups & Uptime Monitoring</li>
+              </ul>
+            </div>
+
+            <button
+              onClick={() => onNavigate('vps')}
+              className="w-full py-3 rounded-xl font-semibold text-sm bg-zinc-800/90 text-white hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 mt-4"
+            >
+              <span>Explore VPS Plans</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -477,7 +477,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
             Ready to Launch Your Server?
           </h2>
           <p className="text-zinc-400 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
-            Join thousands of server owners and bot developers hosting on AetherPanel today. Free migration assistance available.
+            Join thousands of server owners and bot developers hosting on MonoNode today. Free migration assistance available.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
             <button

@@ -92,7 +92,7 @@ export const Docs: React.FC = () => {
                 <div className="grid gap-6">
                   {[
                     { title: 'Create Account', desc: 'Register with your email and verify your details.' },
-                    { title: 'Browse Plans', desc: 'Compare Minecraft and Discord Bot hosting tiers on the Pricing page.' },
+                    { title: 'Browse Plans', desc: 'Compare Bot Hosting and VPS Hosting tiers on the Pricing page.' },
                     { title: 'Add Credits', desc: 'Top up your account balance using your preferred payment method.' },
                     { title: 'Track Orders', desc: 'View order status and history any time from your Dashboard.' }
                   ].map((step, i) => (

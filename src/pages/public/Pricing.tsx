@@ -60,8 +60,8 @@ const ACCENTS = [
 
 // Keep the original look for the two built-in categories; rotate for new ones.
 function accentFor(product: PublicProduct, index: number): string {
-  if (product.category === 'minecraft') return ACCENTS[0];
-  if (product.category === 'bot') return ACCENTS[1];
+  if (product.category === 'bot') return ACCENTS[0];
+  if (product.category === 'vps') return ACCENTS[1];
   return ACCENTS[2 + (index % (ACCENTS.length - 2))];
 }
 

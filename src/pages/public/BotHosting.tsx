@@ -38,13 +38,13 @@ export const BotHosting: React.FC<BotHostingProps> = ({ onNavigate }) => {
       <div className="text-center max-w-3xl mx-auto space-y-4 px-4">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs font-semibold text-cyan-400">
           <Bot className="h-4 w-4" />
-          <span>24/7 Discord & Telegram Bot Process Hosting</span>
+          <span>24/7 Discord, Telegram & WhatsApp Bot Hosting</span>
         </div>
         <h1 className="text-4xl sm:text-5xl font-extrabold text-white">
           Keep Your Bots Online 24/7/365
         </h1>
         <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-          Forget home servers and PC restarts. Host Discord.js, Discord.py, or custom bot scripts with low-latency gateway connections, process watchdogs, and environment variable protection.
+          Forget home servers and PC restarts. Host Discord.js, Discord.py, WhatsApp, or custom bot scripts with low-latency gateway connections, process watchdogs, and environment variable protection.
         </p>
 
         {/* Toggle Billing */}
