@@ -1,13 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
   <defs>
-    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fbbf24" />
-      <stop offset="50%" stop-color="#f59e0b" />
-      <stop offset="100%" stop-color="#d97706" />
-    </linearGradient>
-    <linearGradient id="goldGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fef08a" />
-      <stop offset="100%" stop-color="#f59e0b" />
+    <linearGradient id="monoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffa66d" />
+      <stop offset="45%" stop-color="#ff6a1a" />
+      <stop offset="100%" stop-color="#c53f07" />
     </linearGradient>
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="3" result="blur" />
@@ -15,13 +11,17 @@
     </filter>
   </defs>
 
-  <rect width="100" height="100" rx="24" fill="#09090b" />
-  <rect x="2" y="2" width="96" height="96" rx="22" fill="none" stroke="url(#goldGrad)" stroke-width="2" stroke-opacity="0.3" />
+  <rect width="100" height="100" rx="22" fill="#0a0a0b" />
+  <rect x="2" y="2" width="96" height="96" rx="20" fill="none" stroke="url(#monoGrad)" stroke-width="2" stroke-opacity="0.3" />
 
-  <!-- Outer Stylized Hex Shield / Wing Delta -->
-  <path d="M50 16 L80 32 V62 L50 82 L20 62 V32 Z" fill="none" stroke="url(#goldGrad)" stroke-width="4" stroke-linejoin="round" />
-
-  <!-- Inner Aether Core Spark/A Logo Element -->
-  <path d="M50 26 L68 42 L60 70 L50 60 L40 70 L32 42 Z" fill="url(#goldGrad)" filter="url(#glow)" />
-  <circle cx="50" cy="46" r="6" fill="#09090b" />
+  <!-- Node network glyph: central node connected to three satellite nodes -->
+  <g stroke="url(#monoGrad)" stroke-width="4" stroke-linecap="round">
+    <line x1="50" y1="50" x2="50" y2="22" />
+    <line x1="50" y1="50" x2="28" y2="66" />
+    <line x1="50" y1="50" x2="72" y2="66" />
+  </g>
+  <circle cx="50" cy="22" r="8" fill="url(#monoGrad)" filter="url(#glow)" />
+  <circle cx="28" cy="66" r="8" fill="url(#monoGrad)" filter="url(#glow)" />
+  <circle cx="72" cy="66" r="8" fill="url(#monoGrad)" filter="url(#glow)" />
+  <circle cx="50" cy="50" r="11" fill="#0a0a0b" stroke="url(#monoGrad)" stroke-width="4" />
 </svg>
