@@ -1,5 +1,5 @@
 /**
- * AetherPanel Frontend API Client
+ * MonoNode Frontend API Client
  */
 
 export interface ApiResponse<T = any> {

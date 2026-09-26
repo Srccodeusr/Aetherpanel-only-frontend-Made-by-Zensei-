@@ -17,18 +17,18 @@ export interface ThemePreset {
 export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'golden',
-    name: 'Aether Gold (Default)',
-    description: 'The signature dark gold obsidian luxury palette with high-contrast amber highlights.',
-    accent: '#f59e0b',
-    accentHover: '#d97706',
-    bgBase: '#09090b',
-    bgCard: '#18181b',
-    borderColor: 'rgba(245, 158, 11, 0.25)',
-    badgeBg: 'rgba(245, 158, 11, 0.15)',
-    badgeText: '#fbbf24',
-    gradient: 'from-amber-500 via-yellow-500 to-amber-600',
-    glowColor: 'rgba(245, 158, 11, 0.3)',
-    previewColors: ['#09090b', '#18181b', '#f59e0b', '#fbbf24']
+    name: 'MonoNode Orange (Default)',
+    description: 'The signature MonoNode dark palette with high-contrast engineering-orange highlights.',
+    accent: '#ff6a1a',
+    accentHover: '#ee5208',
+    bgBase: '#0a0a0b',
+    bgCard: '#131316',
+    borderColor: 'rgba(255, 106, 26, 0.25)',
+    badgeBg: 'rgba(255, 106, 26, 0.15)',
+    badgeText: '#ff8a3d',
+    gradient: 'from-orange-500 via-amber-500 to-orange-600',
+    glowColor: 'rgba(255, 106, 26, 0.3)',
+    previewColors: ['#0a0a0b', '#131316', '#ff6a1a', '#ff8a3d']
   },
   {
     id: 'emerald',

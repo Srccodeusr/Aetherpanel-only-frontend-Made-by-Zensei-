@@ -20,18 +20,18 @@ interface BrandingContextType {
   setHomepageDescriptionsLocally: (hero: string, footer: string) => void;
 }
 
-const DEFAULT_HERO_DESCRIPTION = 'High-performance Minecraft servers and 24/7 Discord bot hosting, backed by real support. Powered by AMD Ryzen 9 7950X compute hardware and enterprise NVMe storage.';
-const DEFAULT_FOOTER_DESCRIPTION = 'Premium Minecraft & Discord Bot hosting plans built on high-clock AMD Ryzen 9 hardware and NVMe enterprise storage.';
+const DEFAULT_HERO_DESCRIPTION = '24/7 Discord bot hosting and high-performance VPS instances, backed by real support. Powered by high-clock compute hardware and enterprise NVMe storage.';
+const DEFAULT_FOOTER_DESCRIPTION = 'Reliable Bot Hosting and VPS Hosting plans built on the same high-performance network, from budget-friendly value hardware.';
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
 export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [brandName, setBrandName] = useState<string>(() => {
-    return localStorage.getItem('aether_brand_name') || 'AetherPanel';
+    return localStorage.getItem('aether_brand_name') || 'MonoNode';
   });
-  const [brandTagline, setBrandTagline] = useState<string>('Premium Minecraft & Discord Bot Hosting');
-  const [supportEmail, setSupportEmail] = useState<string>('support@aetherpanel.com');
-  const [discordUrl, setDiscordUrl] = useState<string>('https://discord.gg/aetherpanel');
+  const [brandTagline, setBrandTagline] = useState<string>('Bot Hosting & VPS Hosting');
+  const [supportEmail, setSupportEmail] = useState<string>('support@mononode.com');
+  const [discordUrl, setDiscordUrl] = useState<string>('https://discord.gg/mononode');
   const [socialLinks, setSocialLinks] = useState<SocialLinks>(() => {
     const saved = localStorage.getItem('aether_social_links');
     if (saved) {
@@ -40,13 +40,13 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } catch {}
     }
     return {
-      discord: 'https://discord.gg/aetherpanel',
-      twitter: 'https://twitter.com/aetherpanel',
-      github: 'https://github.com/aetherpanel'
+      discord: 'https://discord.gg/mononode',
+      twitter: 'https://twitter.com/mononode',
+      github: 'https://github.com/mononode'
     };
   });
   const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false);
-  const [maintenanceMessage, setMaintenanceMessage] = useState<string>('AetherPanel is currently performing scheduled system upgrades.');
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string>('MonoNode is currently performing scheduled system upgrades.');
   const [pageAnimationsEnabled, setPageAnimationsEnabled] = useState<boolean>(() => {
     const saved = localStorage.getItem('aether_page_animations_enabled');
     return saved !== null ? saved === 'true' : true;
@@ -101,7 +101,7 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Update document.title dynamically when brandName updates
   useEffect(() => {
     if (brandName) {
-      document.title = `${brandName} — Premium Minecraft & Discord Bot Hosting`;
+      document.title = `${brandName} — Bot Hosting & VPS Hosting`;
     }
   }, [brandName]);
 
@@ -110,7 +110,7 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (trimmed) {
       setBrandName(trimmed);
       localStorage.setItem('aether_brand_name', trimmed);
-      document.title = `${trimmed} — Premium Minecraft & Discord Bot Hosting`;
+      document.title = `${trimmed} — Bot Hosting & VPS Hosting`;
     }
   };
 
