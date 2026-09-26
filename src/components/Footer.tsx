@@ -1,6 +1,6 @@
 import React from 'react';
 import { Github, Twitter, Disc as Discord, Shield, Heart } from 'lucide-react';
-import { AetherLogo } from './AetherLogo';
+import { MonoLogo } from './MonoLogo';
 import { useBranding } from '../lib/BrandingContext';
 
 interface FooterProps {
@@ -17,7 +17,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           
           {/* Col 1 */}
           <div className="space-y-4 md:col-span-1">
-            <AetherLogo onClick={() => onNavigate('home')} />
+            <MonoLogo onClick={() => onNavigate('home')} />
             <p className="text-xs text-zinc-400 leading-relaxed">
               {footerDescription}
             </p>
@@ -66,16 +66,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <h4 className="text-xs font-semibold text-white uppercase tracking-wider mb-4 font-mono">Hosting Products</h4>
             <ul className="space-y-2.5 text-xs">
               <li>
-                <button onClick={() => onNavigate('minecraft')} className="hover:text-white transition-colors">Minecraft Paper / Spigot</button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('minecraft')} className="hover:text-white transition-colors">Forge & Fabric Modpacks</button>
-              </li>
-              <li>
                 <button onClick={() => onNavigate('bot')} className="hover:text-white transition-colors">Discord Bot (Node.js & Python)</button>
               </li>
               <li>
                 <button onClick={() => onNavigate('bot')} className="hover:text-white transition-colors">Bun & Go Bot Runtimes</button>
+              </li>
+              <li>
+                <button onClick={() => onNavigate('vps')} className="hover:text-white transition-colors">VPS Hosting</button>
+              </li>
+              <li>
+                <button onClick={() => onNavigate('vps')} className="hover:text-white transition-colors">Full Root Access Servers</button>
               </li>
               <li>
                 <button onClick={() => onNavigate('pricing')} className="hover:text-white transition-colors">Enterprise Dedicated Nodes</button>

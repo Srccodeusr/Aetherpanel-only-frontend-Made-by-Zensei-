@@ -10,7 +10,7 @@ import {
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
 import { apiRequest } from '../lib/api';
-import { AetherLogo } from './AetherLogo';
+import { MonoLogo } from './MonoLogo';
 
 interface NavbarProps {
   currentPage: string;
@@ -96,7 +96,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
 
         {/* Logo */}
-        <AetherLogo onClick={() => handleNav('home')} />
+        <MonoLogo onClick={() => handleNav('home')} />
 
         {/* Navigation links (Desktop) */}
         <nav className="hidden lg:flex items-center gap-1">
@@ -109,17 +109,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => handleNav('minecraft')}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'minecraft' ? 'text-white bg-zinc-800/60' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
-          >
-            Minecraft
-          </button>
-          <button
-            type="button"
             onClick={() => handleNav('bot')}
             className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'bot' ? 'text-white bg-zinc-800/60' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
           >
-            Discord Bots
+            Bot Hosting
+          </button>
+          <button
+            type="button"
+            onClick={() => handleNav('vps')}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === 'vps' ? 'text-white bg-zinc-800/60' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+          >
+            VPS Hosting
           </button>
           <button
             type="button"
@@ -287,7 +287,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="space-y-5">
               {/* Drawer Top Header */}
               <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
-                <AetherLogo onClick={() => handleNav('home')} />
+                <MonoLogo onClick={() => handleNav('home')} />
                 <button
                   type="button"
                   onClick={(e) => {
@@ -394,13 +394,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                           className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-appearance' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
                         >
                           <Palette className="h-4 w-4" /> Fonts & Themes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleNav('admin-page-designer')}
-                          className={`w-full flex items-center gap-3 px-3.5 py-3 min-h-[44px] rounded-xl text-xs font-semibold ${currentPage === 'admin-page-designer' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-300 hover:bg-zinc-900'}`}
-                        >
-                          <Palette className="h-4 w-4" /> Page Designer
                         </button>
                         <button
                           type="button"
@@ -537,17 +530,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleNav('minecraft')}
-                    className={`px-3 py-3 min-h-[44px] rounded-xl text-xs font-semibold text-left transition-colors ${currentPage === 'minecraft' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-300 hover:bg-zinc-900'}`}
-                  >
-                    Minecraft
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleNav('bot')}
                     className={`px-3 py-3 min-h-[44px] rounded-xl text-xs font-semibold text-left transition-colors ${currentPage === 'bot' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-300 hover:bg-zinc-900'}`}
                   >
-                    Discord Bots
+                    Bot Hosting
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleNav('vps')}
+                    className={`px-3 py-3 min-h-[44px] rounded-xl text-xs font-semibold text-left transition-colors ${currentPage === 'vps' ? 'bg-zinc-800 text-white font-bold' : 'text-zinc-300 hover:bg-zinc-900'}`}
+                  >
+                    VPS Hosting
                   </button>
                   <button
                     type="button"

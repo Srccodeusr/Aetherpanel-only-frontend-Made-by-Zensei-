@@ -3,7 +3,7 @@ import {
   Search, Shield, HelpCircle,
   Activity, User, Sparkles, BookOpen,
   CreditCard, Tag, ArrowRight, X, Package,
-  Users, Megaphone, ShoppingBag, MessageSquare, Link2, Palette
+  Users, Megaphone, ShoppingBag, MessageSquare, Link2
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 
@@ -52,7 +52,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
       {
         id: 'nav_pricing',
         title: 'Pricing & Plans',
-        subtitle: 'Browse Minecraft & Discord Bot hosting plans',
+        subtitle: 'Browse Bot & VPS hosting plans',
         category: 'navigation',
         icon: Sparkles,
         action: () => onNavigate('pricing')
@@ -164,14 +164,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
           category: 'admin',
           icon: MessageSquare,
           action: () => onNavigate('admin-discord')
-        },
-        {
-          id: 'admin_page_designer',
-          title: 'Page Designer',
-          subtitle: 'Override any page\u2019s HTML & CSS, or replace it entirely',
-          category: 'admin',
-          icon: Palette,
-          action: () => onNavigate('admin-page-designer')
         }
       );
     }
