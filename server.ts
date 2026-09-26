@@ -1,7 +1,6 @@
 import express, { Response } from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 
 import { authMiddleware, AuthenticatedRequest } from './server/auth';
 import { getDb } from './server/db';
@@ -131,6 +130,9 @@ async function startServer() {
 
   // Vite Integration for SPA Development and Production Serving
   if (process.env.NODE_ENV !== 'production') {
+    // Dynamically imported so the entire Vite/esbuild/Rollup dev toolchain
+    // is never touched (or required to be installed) in production.
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -142,8 +144,23 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        // Vite content-hashes everything under /assets, so those are safe
+        // to cache forever. Everything else (favicon, logo svgs, etc.) gets
+        // a short/no-cache policy in case it's updated in place.
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }));
     app.get('*', (req, res) => {
+      // The HTML shell references hashed asset filenames, so it must never
+      // be cached — otherwise clients can get stuck on stale asset links.
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
